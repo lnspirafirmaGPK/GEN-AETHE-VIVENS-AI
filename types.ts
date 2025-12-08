@@ -9,6 +9,10 @@ export interface ChatMessage {
   text: string;
   isThinking?: boolean;
   timestamp: number;
+  attachment?: {
+    name: string;
+    type: string;
+  };
 }
 
 export enum AppMode {
