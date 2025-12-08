@@ -3,7 +3,7 @@ import { Send, Bot, User as UserIcon, BrainCircuit, Loader2, Paperclip, X, FileT
 import { createChatSession } from '../services/gemini';
 import { ChatMessage, Sender } from '../types';
 import { Chat, GenerateContentResponse } from '@google/genai';
-import { blobToBase64 } from '../utils/audio';
+import { blobToBase64 } from '../services/audio';
 
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);

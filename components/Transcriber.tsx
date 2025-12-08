@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { FileAudio, Upload, Loader2, CheckCircle2, Mic, Square } from 'lucide-react';
 import { transcribeAudioFile } from '../services/gemini';
-import { blobToBase64 } from '../utils/audio';
+import { blobToBase64 } from '../services/audio';
 
 const Transcriber: React.FC = () => {
   const [transcription, setTranscription] = useState<string>('');

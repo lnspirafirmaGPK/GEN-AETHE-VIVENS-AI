@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle, Sparkles } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { float32ToInt16, base64ToArrayBuffer, arrayBufferToBase64 } from '../utils/audio';
-
-const apiKey = process.env.API_KEY || '';
+import { float32ToInt16, base64ToArrayBuffer, arrayBufferToBase64 } from '../services/audio';
 
 const LiveInterface: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -25,7 +23,7 @@ const LiveInterface: React.FC = () => {
   const isMountedRef = useRef<boolean>(true);
   
   // Animation for visualizer
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -85,15 +83,15 @@ const LiveInterface: React.FC = () => {
         return;
       }
 
-      aiRef.current = new GoogleGenAI({ apiKey });
+      aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       // Automatic language detection based on browser locale
       const userLocale = navigator.language || 'en-US';
-      const isThai = userLocale.toLowerCase().startsWith('th');
       
-      // Adjust speechConfig based on detected language
-      // 'Benjarat' for Thai preference, 'Kore' as a standard fallback for English/Others
-      const voiceName = isThai ? 'Benjarat' : 'Kore';
+      // Use a supported voice.
+      // Supported voices: Puck, Charon, Kore, Fenrir, Zephyr.
+      // We use 'Kore' as a standard clear voice. The model handles the language switching (Thai/English) via systemInstruction.
+      const voiceName = 'Kore'; 
 
       console.log(`Detected locale: ${userLocale}, using voice: ${voiceName}`);
 
