@@ -43,7 +43,7 @@ const App: React.FC = () => {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm">
               AI
             </div>
-            <span className="hidden lg:block ml-3 font-bold text-slate-800 dark:text-slate-100 text-lg">ThaiGemini</span>
+            <span className="hidden lg:block ml-3 font-bold text-slate-800 dark:text-slate-100 text-sm xl:text-lg truncate">GEN-AETHE-VIVENS-AI</span>
           </div>
 
           <nav className="p-4 space-y-2">

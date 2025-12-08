@@ -10,18 +10,21 @@ interface LiveInterfaceProps {
 const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [volumeLevel, setVolumeLevel] = useState(0);
+  const [volumeLevel, setVolumeLevel] = useState(0); // User input volume
+  const [aiVolume, setAiVolume] = useState(0); // AI output volume
   const [error, setError] = useState<string | null>(null);
 
   // Audio References
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const outputAnalyserRef = useRef<AnalyserNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const aiRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
+  const rafRef = useRef<number | null>(null);
 
   const initializeAudio = async () => {
     try {
@@ -40,6 +43,13 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
       // Ensure contexts are running
       if (inputCtx.state === 'suspended') await inputCtx.resume();
       if (outputCtx.state === 'suspended') await outputCtx.resume();
+
+      // Setup Output Analyser for AI Voice Visualization
+      const analyser = outputCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.5;
+      analyser.connect(outputCtx.destination);
+      outputAnalyserRef.current = analyser;
 
       inputAudioContextRef.current = inputCtx;
       outputAudioContextRef.current = outputCtx;
@@ -68,8 +78,6 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
       const isThai = userLang.startsWith('th');
       
       // Adjust system instruction based on detected language
-      // Note: We keep the voiceName as 'Kore' as it handles multilingual output well.
-      // The systemInstruction drives the language choice.
       const systemInstruction = isThai 
         ? 'คุณคือผู้ช่วย AI อัจฉริยะที่พูดภาษาไทยได้อย่างคล่องแคล่ว สุภาพ และเป็นธรรมชาติ โปรดฟังและตอบโต้เป็นภาษาไทยเป็นหลัก แต่สามารถสลับเป็นภาษาอังกฤษได้ทันทีหากคู่สนทนาพูดภาษาอังกฤษ'
         : 'You are a helpful AI assistant. Detect the user language automatically. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.';
@@ -77,7 +85,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
       const sessionPromise = aiRef.current.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-          responseModalities: ['AUDIO'], // Use string literal to avoid CDN enum issues
+          responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
@@ -101,7 +109,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
 
                const inputData = e.inputBuffer.getChannelData(0);
                
-               // Simple volume meter
+               // Simple volume meter for Input
                let sum = 0;
                for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
                const rms = Math.sqrt(sum / inputData.length);
@@ -143,7 +151,13 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
 
               const source = audioCtx.createBufferSource();
               source.buffer = audioBuffer;
-              source.connect(audioCtx.destination);
+              
+              // Route through analyser if available, otherwise straight to destination
+              if (outputAnalyserRef.current) {
+                source.connect(outputAnalyserRef.current);
+              } else {
+                source.connect(audioCtx.destination);
+              }
 
               const currentTime = audioCtx.currentTime;
               if (nextStartTimeRef.current < currentTime) {
@@ -177,7 +191,13 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   const disconnect = () => {
     setIsConnected(false);
     setVolumeLevel(0);
+    setAiVolume(0);
     
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+
     // Clean up audio nodes
     if (processorRef.current) {
       processorRef.current.disconnect();
@@ -187,6 +207,10 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
     if (inputSourceRef.current) {
       inputSourceRef.current.disconnect();
       inputSourceRef.current = null;
+    }
+    if (outputAnalyserRef.current) {
+      outputAnalyserRef.current.disconnect();
+      outputAnalyserRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -210,6 +234,35 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   const toggleMute = () => {
     setIsMuted(!isMuted);
   };
+
+  // Visualization Loop for AI Voice
+  useEffect(() => {
+    const updateVisualizers = () => {
+      if (outputAnalyserRef.current && isConnected) {
+        const dataArray = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
+        outputAnalyserRef.current.getByteFrequencyData(dataArray);
+        
+        // Calculate average volume
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const avg = sum / dataArray.length;
+        
+        // Normalize 0-1
+        setAiVolume(avg / 255);
+      }
+      rafRef.current = requestAnimationFrame(updateVisualizers);
+    };
+
+    if (isConnected) {
+      updateVisualizers();
+    } else {
+      setAiVolume(0);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    }
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isConnected]);
 
   useEffect(() => {
     // Auto-connect if permission granted to provide seamless experience
@@ -238,24 +291,41 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
         
         {/* Visualizer Circle */}
         <div className="relative group">
-          <div className={`absolute inset-0 bg-blue-500 rounded-full blur-2xl opacity-20 transition-all duration-100 ease-out`} 
-               style={{ transform: `scale(${1 + volumeLevel})` }} 
+          {/* User Voice Glow (Blue) */}
+          <div className={`absolute inset-0 bg-blue-500 rounded-full blur-2xl transition-all duration-100 ease-out`} 
+               style={{ 
+                 transform: `scale(${1 + volumeLevel})`,
+                 opacity: volumeLevel > 0.01 ? 0.4 : 0
+               }} 
           />
+          
+          {/* AI Voice Glow (Purple/Indigo) - Requested Feature */}
+          <div className={`absolute inset-0 bg-indigo-500 rounded-full blur-2xl transition-all duration-100 ease-out mix-blend-screen`}
+               style={{ 
+                 transform: `scale(${1 + aiVolume * 2})`,
+                 opacity: aiVolume > 0.01 ? 0.6 : 0
+               }}
+          />
+
+          {/* Core Avatar */}
           <div className={`
-            w-48 h-48 rounded-full border-4 flex items-center justify-center relative shadow-2xl transition-all duration-300
+            w-48 h-48 rounded-full border-4 flex items-center justify-center relative shadow-2xl transition-all duration-300 z-10
             ${isConnected 
               ? 'border-blue-400/50 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md' 
               : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'}
+            ${aiVolume > 0.1 ? 'border-indigo-400 dark:border-indigo-400' : ''}
           `}>
              {isConnected ? (
                <div className="flex gap-1 items-end h-16">
-                 {/* Fake Visualizer bars driven by volume */}
+                 {/* Fake Visualizer bars driven by volume (mixed) */}
                  {[...Array(5)].map((_, i) => (
                    <div 
                      key={i} 
-                     className="w-3 bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-75"
+                     className={`w-3 rounded-full transition-all duration-75 ${
+                        aiVolume > 0.05 ? 'bg-indigo-500 dark:bg-indigo-400' : 'bg-blue-500 dark:bg-blue-400'
+                     }`}
                      style={{ 
-                       height: `${20 + (volumeLevel * 100 * Math.random())}%`,
+                       height: `${20 + (Math.max(volumeLevel, aiVolume) * 100 * Math.random())}%`,
                        opacity: 0.8 
                      }}
                    />
@@ -267,8 +337,10 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
           </div>
           
           {isConnected && (
-            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-blue-600 dark:text-blue-300 text-sm font-medium animate-pulse whitespace-nowrap">
-              {translations.listening}
+            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-sm font-medium animate-pulse whitespace-nowrap transition-colors duration-300
+              ${aiVolume > 0.05 ? 'text-indigo-600 dark:text-indigo-300' : 'text-blue-600 dark:text-blue-300'}"
+            >
+              {aiVolume > 0.05 ? "Gemini is speaking..." : translations.listening}
             </div>
           )}
         </div>
