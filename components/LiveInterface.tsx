@@ -22,9 +22,17 @@ const LiveInterface: React.FC = () => {
   const nextStartTimeRef = useRef<number>(0);
   const aiRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
+  const isMountedRef = useRef<boolean>(true);
   
   // Animation for visualizer
   const animationFrameRef = useRef<number>();
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const initializeAudio = async () => {
     try {
@@ -69,17 +77,34 @@ const LiveInterface: React.FC = () => {
     setError(null);
     try {
       const { stream, inputCtx, outputCtx } = await initializeAudio();
+      
+      if (!isMountedRef.current) {
+        inputCtx.close();
+        outputCtx.close();
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
 
       aiRef.current = new GoogleGenAI({ apiKey });
       
+      // Automatic language detection based on browser locale
+      const userLocale = navigator.language || 'en-US';
+      const isThai = userLocale.toLowerCase().startsWith('th');
+      
+      // Adjust speechConfig based on detected language
+      // 'Benjarat' for Thai preference, 'Kore' as a standard fallback for English/Others
+      const voiceName = isThai ? 'Benjarat' : 'Kore';
+
+      console.log(`Detected locale: ${userLocale}, using voice: ${voiceName}`);
+
       const sessionPromise = aiRef.current.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
           },
-          systemInstruction: 'You are a helpful AI assistant capable of Thai and English conversation. Respond naturally and concisely. If I speak Thai, respond in Thai.',
+          systemInstruction: `You are a helpful AI assistant. The user's system locale is ${userLocale}. Respond naturally. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.`,
         },
         callbacks: {
           onopen: () => {
@@ -269,7 +294,24 @@ const LiveInterface: React.FC = () => {
     };
   }, [isConnected]);
 
+  // Auto-connect if permission granted & Cleanup
   useEffect(() => {
+    const checkPermissionAndConnect = async () => {
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+           const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+           if (result.state === 'granted') {
+             console.log("Microphone permission granted, connecting automatically...");
+             await connectToLive();
+           }
+        }
+      } catch (e) {
+        console.debug("Auto-connect check failed", e);
+      }
+    };
+
+    checkPermissionAndConnect();
+
     return () => {
       disconnect();
     };
