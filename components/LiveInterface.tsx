@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { float32ToInt16, base64ToArrayBuffer, arrayBufferToBase64 } from '../services/audio';
 
@@ -7,30 +7,17 @@ const LiveInterface: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0);
-  const [aiVolumeLevel, setAiVolumeLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   // Audio References
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
-  const outputAnalyserRef = useRef<AnalyserNode | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const aiRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
-  const isMountedRef = useRef<boolean>(true);
-  
-  // Animation for visualizer
-  const animationFrameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   const initializeAudio = async () => {
     try {
@@ -45,29 +32,14 @@ const LiveInterface: React.FC = () => {
 
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      
-      // Setup Analyser for AI output
-      const analyser = outputCtx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.connect(outputCtx.destination);
-      outputAnalyserRef.current = analyser;
 
       inputAudioContextRef.current = inputCtx;
       outputAudioContextRef.current = outputCtx;
 
       return { stream, inputCtx, outputCtx };
-    } catch (err: any) {
+    } catch (err) {
       console.error("Audio initialization error:", err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        throw new Error("Microphone permission denied. Please allow access in your browser settings.");
-      }
-      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        throw new Error("No microphone found. Please check your audio devices.");
-      }
-      if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        throw new Error("Microphone is busy or not readable. Please check if another app is using it.");
-      }
-      throw new Error(`Audio device error: ${err.message || "Unknown error"}`);
+      throw new Error("Could not access microphone.");
     }
   };
 
@@ -76,33 +48,16 @@ const LiveInterface: React.FC = () => {
     try {
       const { stream, inputCtx, outputCtx } = await initializeAudio();
       
-      if (!isMountedRef.current) {
-        inputCtx.close();
-        outputCtx.close();
-        stream.getTracks().forEach(t => t.stop());
-        return;
-      }
-
       aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      // Automatic language detection based on browser locale
-      const userLocale = navigator.language || 'en-US';
-      
-      // Use a supported voice.
-      // Supported voices: Puck, Charon, Kore, Fenrir, Zephyr.
-      // We use 'Kore' as a standard clear voice. The model handles the language switching (Thai/English) via systemInstruction.
-      const voiceName = 'Kore'; 
-
-      console.log(`Detected locale: ${userLocale}, using voice: ${voiceName}`);
-
       const sessionPromise = aiRef.current.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
-          systemInstruction: `You are a helpful AI assistant. The user's system locale is ${userLocale}. Respond naturally. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.`,
+          systemInstruction: 'You are a helpful AI assistant. Respond naturally. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.',
         },
         callbacks: {
           onopen: () => {
@@ -122,11 +77,11 @@ const LiveInterface: React.FC = () => {
 
                const inputData = e.inputBuffer.getChannelData(0);
                
-               // User volume visualization
+               // Simple volume meter
                let sum = 0;
                for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
                const rms = Math.sqrt(sum / inputData.length);
-               setVolumeLevel(Math.min(rms * 5, 1));
+               setVolumeLevel(Math.min(rms * 5, 1)); // Scale for visuals
 
                // Convert to PCM 16-bit
                const int16Data = float32ToInt16(inputData);
@@ -164,13 +119,7 @@ const LiveInterface: React.FC = () => {
 
               const source = audioCtx.createBufferSource();
               source.buffer = audioBuffer;
-              
-              // Connect to analyser if available, otherwise destination
-              if (outputAnalyserRef.current) {
-                source.connect(outputAnalyserRef.current);
-              } else {
-                source.connect(audioCtx.destination);
-              }
+              source.connect(audioCtx.destination);
 
               const currentTime = audioCtx.currentTime;
               if (nextStartTimeRef.current < currentTime) {
@@ -184,27 +133,9 @@ const LiveInterface: React.FC = () => {
             console.log("Session closed");
             disconnect();
           },
-          onerror: (err: any) => {
+          onerror: (err) => {
             console.error("Session error:", err);
-            let errorMessage = "An unexpected connection error occurred.";
-            
-            if (err instanceof Error) {
-                errorMessage = err.message;
-            } else if (err instanceof ErrorEvent) {
-                errorMessage = `Connection failed: ${err.message || "Network issue"}`;
-            } else if (typeof err === 'string') {
-                errorMessage = err;
-            } else if (typeof err === 'object' && err !== null && 'message' in err) {
-                errorMessage = (err as any).message;
-            }
-            
-            if (errorMessage.includes("403")) {
-              errorMessage = "Access denied (403). Please verify your API key.";
-            } else if (errorMessage.includes("503")) {
-              errorMessage = "Service unavailable (503). The model may be overloaded.";
-            }
-
-            setError(errorMessage);
+            setError("Connection error. Please try again.");
             disconnect();
           }
         }
@@ -221,7 +152,6 @@ const LiveInterface: React.FC = () => {
   const disconnect = () => {
     setIsConnected(false);
     setVolumeLevel(0);
-    setAiVolumeLevel(0);
     
     // Clean up audio nodes
     if (processorRef.current) {
@@ -246,11 +176,6 @@ const LiveInterface: React.FC = () => {
       outputAudioContextRef.current = null;
     }
     
-    outputAnalyserRef.current = null;
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-
     sessionRef.current?.then((s: any) => {
         if(s.close) s.close();
     });
@@ -261,55 +186,7 @@ const LiveInterface: React.FC = () => {
     setIsMuted(!isMuted);
   };
 
-  // AI Volume Animation Loop
   useEffect(() => {
-    if (isConnected) {
-      const updateAiVolume = () => {
-        if (outputAnalyserRef.current) {
-          const dataArray = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
-          outputAnalyserRef.current.getByteFrequencyData(dataArray);
-          
-          const sum = dataArray.reduce((a, b) => a + b, 0);
-          const average = sum / dataArray.length;
-          // Normalize and smooth
-          const vol = Math.min(average / 50, 1.2); 
-          setAiVolumeLevel(vol);
-        }
-        animationFrameRef.current = requestAnimationFrame(updateAiVolume);
-      };
-      updateAiVolume();
-    } else {
-      setAiVolumeLevel(0);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    }
-    
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [isConnected]);
-
-  // Auto-connect if permission granted & Cleanup
-  useEffect(() => {
-    const checkPermissionAndConnect = async () => {
-      try {
-        if (navigator.permissions && navigator.permissions.query) {
-           const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-           if (result.state === 'granted') {
-             console.log("Microphone permission granted, connecting automatically...");
-             await connectToLive();
-           }
-        }
-      } catch (e) {
-        console.debug("Auto-connect check failed", e);
-      }
-    };
-
-    checkPermissionAndConnect();
-
     return () => {
       disconnect();
     };
@@ -325,49 +202,28 @@ const LiveInterface: React.FC = () => {
         
         {/* Visualizer Circle */}
         <div className="relative group">
-          {/* User Voice Glow */}
           <div className={`absolute inset-0 bg-blue-500 rounded-full blur-2xl opacity-20 transition-all duration-100 ease-out`} 
                style={{ transform: `scale(${1 + volumeLevel})` }} 
           />
-          {/* AI Voice Glow */}
-          {isConnected && (
-            <div className={`absolute inset-0 bg-purple-500 rounded-full blur-2xl transition-all duration-100 ease-out`} 
-                 style={{ 
-                   transform: `scale(${1 + aiVolumeLevel})`, 
-                   opacity: aiVolumeLevel > 0.1 ? 0.3 : 0 
-                 }} 
-            />
-          )}
-
           <div className={`
-            w-48 h-48 rounded-full border-4 flex items-center justify-center relative shadow-2xl transition-all duration-300 overflow-hidden
+            w-48 h-48 rounded-full border-4 flex items-center justify-center relative shadow-2xl transition-all duration-300
             ${isConnected 
               ? 'border-blue-400/30 bg-slate-800/80 backdrop-blur-md' 
               : 'border-slate-700 bg-slate-800'}
           `}>
              {isConnected ? (
-               <div className="relative flex items-center justify-center w-full h-full">
-                 {/* AI Pulse Icon */}
-                 <div className="absolute z-10 transition-transform duration-75"
-                      style={{ transform: `scale(${1 + (aiVolumeLevel * 0.4)})` }}>
-                    <Sparkles 
-                      size={48} 
-                      className={`text-purple-300 transition-all duration-200 ${aiVolumeLevel > 0.05 ? 'opacity-100 drop-shadow-[0_0_15px_rgba(168,85,247,0.8)]' : 'opacity-30'}`} 
-                    />
-                 </div>
-
-                 {/* User Mic Visualizer (Bars) */}
-                 <div className="absolute bottom-8 flex gap-1 items-end h-8 opacity-40">
-                    {[...Array(5)].map((_, i) => (
-                       <div 
-                         key={i} 
-                         className="w-2 bg-blue-400 rounded-full transition-all duration-75"
-                         style={{ 
-                           height: `${20 + (volumeLevel * 100 * Math.random())}%`,
-                         }}
-                       />
-                    ))}
-                 </div>
+               <div className="flex gap-1 items-end h-16">
+                 {/* Fake Visualizer bars driven by volume */}
+                 {[...Array(5)].map((_, i) => (
+                   <div 
+                     key={i} 
+                     className="w-3 bg-blue-400 rounded-full transition-all duration-75"
+                     style={{ 
+                       height: `${20 + (volumeLevel * 100 * Math.random())}%`,
+                       opacity: 0.7 
+                     }}
+                   />
+                 ))}
                </div>
              ) : (
                <Radio size={48} className="text-slate-500" />
@@ -376,7 +232,7 @@ const LiveInterface: React.FC = () => {
           
           {isConnected && (
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-blue-200 text-sm font-medium animate-pulse whitespace-nowrap">
-              {aiVolumeLevel > 0.1 ? "Gemini is speaking..." : "Listening..."}
+              Listening...
             </div>
           )}
         </div>
@@ -389,9 +245,9 @@ const LiveInterface: React.FC = () => {
             </p>
           )}
           {error && (
-             <div className="flex items-center justify-center gap-3 text-red-200 bg-red-900/40 border border-red-500/30 px-4 py-3 rounded-lg shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2">
-               <AlertCircle size={18} className="flex-shrink-0" />
-               <span className="text-sm font-medium">{error}</span>
+             <div className="flex items-center justify-center gap-2 text-red-300 bg-red-900/20 border border-red-900/50 px-4 py-2 rounded-lg">
+               <AlertCircle size={16} />
+               <span className="text-sm">{error}</span>
              </div>
           )}
         </div>
