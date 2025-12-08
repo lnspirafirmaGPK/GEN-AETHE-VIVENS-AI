@@ -1,8 +1,7 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const createChatSession = (useThinking: boolean = false) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-pro-preview';
   
   const config: any = {
@@ -20,6 +19,7 @@ export const createChatSession = (useThinking: boolean = false) => {
 };
 
 export const transcribeAudioFile = async (audioBase64: string, mimeType: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   // Use Flash for fast transcription
   const model = 'gemini-2.5-flash'; 
 

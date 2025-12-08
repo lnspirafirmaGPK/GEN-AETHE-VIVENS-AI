@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle } from 'lucide-react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage } from '@google/genai';
 import { float32ToInt16, base64ToArrayBuffer, arrayBufferToBase64 } from '../services/audio';
 
 interface LiveInterfaceProps {
@@ -37,6 +37,10 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
+      // Ensure contexts are running
+      if (inputCtx.state === 'suspended') await inputCtx.resume();
+      if (outputCtx.state === 'suspended') await outputCtx.resume();
+
       inputAudioContextRef.current = inputCtx;
       outputAudioContextRef.current = outputCtx;
 
@@ -50,19 +54,34 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   const connectToLive = async () => {
     setError(null);
     try {
+      if (!process.env.API_KEY) {
+        throw new Error("API Key not found.");
+      }
+
       // Create AI instance first
       aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const { stream, inputCtx, outputCtx } = await initializeAudio();
+
+      // Detect user language from browser settings
+      const userLang = navigator.language || 'en-US';
+      const isThai = userLang.startsWith('th');
+      
+      // Adjust system instruction based on detected language
+      // Note: We keep the voiceName as 'Kore' as it handles multilingual output well.
+      // The systemInstruction drives the language choice.
+      const systemInstruction = isThai 
+        ? 'คุณคือผู้ช่วย AI อัจฉริยะที่พูดภาษาไทยได้อย่างคล่องแคล่ว สุภาพ และเป็นธรรมชาติ โปรดฟังและตอบโต้เป็นภาษาไทยเป็นหลัก แต่สามารถสลับเป็นภาษาอังกฤษได้ทันทีหากคู่สนทนาพูดภาษาอังกฤษ'
+        : 'You are a helpful AI assistant. Detect the user language automatically. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.';
       
       const sessionPromise = aiRef.current.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: ['AUDIO'], // Use string literal to avoid CDN enum issues
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
-          systemInstruction: 'You are a helpful AI assistant. Detect the user language automatically. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.',
+          systemInstruction: systemInstruction,
         },
         callbacks: {
           onopen: () => {
@@ -149,6 +168,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
       sessionRef.current = sessionPromise;
 
     } catch (e: any) {
+      console.error("Connection failed:", e);
       setError(e.message || "Failed to establish connection.");
       disconnect();
     }
@@ -192,6 +212,13 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   };
 
   useEffect(() => {
+    // Auto-connect if permission granted to provide seamless experience
+    navigator.permissions.query({ name: 'microphone' as PermissionName }).then((permissionStatus) => {
+      if (permissionStatus.state === 'granted') {
+        connectToLive();
+      }
+    });
+
     return () => {
       disconnect();
     };

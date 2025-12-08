@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { FileAudio, Upload, Loader2, CheckCircle2, Mic, Square } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { FileAudio, Upload, Loader2, CheckCircle2, Mic, Square, Activity } from 'lucide-react';
 import { transcribeAudioFile } from '../services/gemini';
-import { blobToBase64 } from '../services/audio';
+import { blobToBase64, float32ToInt16, arrayBufferToBase64 } from '../services/audio';
+import { GoogleGenAI, LiveServerMessage } from '@google/genai';
 
 interface TranscriberProps {
   translations: any;
@@ -13,57 +14,149 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
   const [error, setError] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   
-  // Recording states
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  // Streaming states
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamVolume, setStreamVolume] = useState(0);
+
+  // Audio Refs
+  const inputAudioContextRef = useRef<AudioContext | null>(null);
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const sessionRef = useRef<any>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setAudioFile(e.target.files[0]);
       setError(null);
-      setTranscription('');
+      // Don't clear transcription immediately if they want to compare, but usually good UX to clear or append
+      // setTranscription(''); 
     }
   };
 
-  const startRecording = async () => {
+  const startStreaming = async () => {
+    setError(null);
+    setTranscription(''); // Clear previous transcription for new stream
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
+      if (!process.env.API_KEY) throw new Error("API Key missing");
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } 
+      });
+      streamRef.current = stream;
 
-      mediaRecorder.start();
-      setIsRecording(true);
-      setError(null);
-      setAudioFile(null);
-      setTranscription('');
+      const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      if (inputCtx.state === 'suspended') await inputCtx.resume();
+      inputAudioContextRef.current = inputCtx;
+
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      const sessionPromise = ai.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        config: {
+          responseModalities: ['AUDIO'], // Required by API even if we only want transcription
+          inputAudioTranscription: {}, // Enable Input Transcription
+          systemInstruction: "You are a transcriber. Your only task is to listen.", // Keep model quiet
+        },
+        callbacks: {
+          onopen: () => {
+            console.log("Streaming started");
+            setIsStreaming(true);
+
+            // Audio Processing
+            const source = inputCtx.createMediaStreamSource(stream);
+            inputSourceRef.current = source;
+            const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+            processorRef.current = processor;
+
+            processor.onaudioprocess = (e) => {
+              const inputData = e.inputBuffer.getChannelData(0);
+              
+              // Volume meter logic
+              let sum = 0;
+              for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
+              setStreamVolume(Math.sqrt(sum / inputData.length));
+
+              // Convert and Send
+              const int16Data = float32ToInt16(inputData);
+              const base64Data = arrayBufferToBase64(int16Data.buffer);
+
+              sessionPromise.then(session => {
+                session.sendRealtimeInput({
+                  media: {
+                    mimeType: 'audio/pcm;rate=16000',
+                    data: base64Data
+                  }
+                });
+              });
+            };
+
+            source.connect(processor);
+            processor.connect(inputCtx.destination);
+          },
+          onmessage: (msg: LiveServerMessage) => {
+            // Check for input transcription
+            const text = msg.serverContent?.inputTranscription?.text;
+            if (text) {
+              setTranscription(prev => prev + text);
+            }
+          },
+          onclose: () => {
+            stopStreaming();
+          },
+          onerror: (err) => {
+            console.error("Streaming error:", err);
+            setError(translations.error);
+            stopStreaming();
+          }
+        }
+      });
+      
+      sessionRef.current = sessionPromise;
+
     } catch (err) {
-      console.error("Mic error:", err);
+      console.error("Mic/Network error:", err);
       setError(translations.micError);
+      stopStreaming();
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        const file = new File([blob], "recording.webm", { type: 'audio/webm' });
-        setAudioFile(file);
-        
-        // Stop all tracks
-        mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
-      };
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+  const stopStreaming = () => {
+    setIsStreaming(false);
+    setStreamVolume(0);
+
+    // Cleanup Audio
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current.onaudioprocess = null;
+      processorRef.current = null;
     }
+    if (inputSourceRef.current) {
+      inputSourceRef.current.disconnect();
+      inputSourceRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (inputAudioContextRef.current) {
+      inputAudioContextRef.current.close();
+      inputAudioContextRef.current = null;
+    }
+
+    // Close Session
+    sessionRef.current?.then((s: any) => {
+      if(s.close) s.close();
+    });
+    sessionRef.current = null;
   };
 
-  const handleTranscribe = async () => {
+  const handleTranscribeFile = async () => {
     if (!audioFile) return;
 
     setIsProcessing(true);
@@ -79,6 +172,13 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
       setIsProcessing(false);
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (isStreaming) stopStreaming();
+    };
+  }, [isStreaming]);
 
   return (
     <div className="h-full bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 overflow-y-auto transition-colors duration-200">
@@ -100,7 +200,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
           {/* File Upload */}
           <div className={`
             border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-3 transition-colors
-            ${audioFile && !isRecording 
+            ${audioFile && !isStreaming 
               ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' 
               : 'border-slate-300 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800'}
           `}>
@@ -110,7 +210,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
               onChange={handleFileUpload} 
               className="hidden" 
               id="audio-upload"
-              disabled={isProcessing || isRecording}
+              disabled={isProcessing || isStreaming}
             />
             <label htmlFor="audio-upload" className="cursor-pointer flex flex-col items-center w-full">
                <Upload size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
@@ -119,32 +219,45 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
             </label>
           </div>
 
-          {/* Recording */}
+          {/* Streaming Recording */}
           <div className={`
             border-2 rounded-xl p-6 flex flex-col items-center justify-center gap-3 transition-colors
-            ${isRecording 
+            ${isStreaming 
               ? 'border-red-400 dark:border-red-500 bg-red-50 dark:bg-red-900/20' 
               : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}
           `}>
-            {isRecording ? (
-              <button 
-                onClick={stopRecording}
-                className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white hover:bg-red-600 transition-colors animate-pulse"
-              >
-                <Square size={24} fill="currentColor" />
-              </button>
+            {isStreaming ? (
+              <div className="relative">
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
+                <button 
+                  onClick={stopStreaming}
+                  className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white hover:bg-red-600 transition-colors z-10 relative"
+                >
+                  <Square size={24} fill="currentColor" />
+                </button>
+              </div>
             ) : (
               <button 
-                onClick={startRecording}
+                onClick={startStreaming}
                 disabled={isProcessing}
                 className="w-16 h-16 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
               >
                 <Mic size={28} />
               </button>
             )}
-            <span className={`text-sm font-medium ${isRecording ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
-              {isRecording ? translations.recordingBtn : translations.recordBtn}
-            </span>
+            <div className="flex flex-col items-center">
+              <span className={`text-sm font-medium ${isStreaming ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                {isStreaming ? translations.recordingBtn : translations.recordBtn}
+              </span>
+              {isStreaming && (
+                <div className="h-1 w-20 bg-slate-200 dark:bg-slate-700 rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-red-500 transition-all duration-100" 
+                    style={{ width: `${Math.min(streamVolume * 500, 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -161,8 +274,8 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
                </div>
              </div>
              <button
-               onClick={handleTranscribe}
-               disabled={isProcessing}
+               onClick={handleTranscribeFile}
+               disabled={isProcessing || isStreaming}
                className="bg-indigo-600 dark:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
              >
                {isProcessing ? <Loader2 className="animate-spin" size={16} /> : null}
@@ -178,18 +291,22 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
           </div>
         )}
 
-        {/* Result */}
-        {transcription && (
-          <div className="space-y-2">
+        {/* Result Area */}
+        <div className="space-y-2">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-green-500" />
+              <CheckCircle2 size={16} className={transcription ? "text-green-500" : "text-slate-300"} />
               {translations.result}
+              {isStreaming && <Activity size={14} className="animate-pulse text-red-500" />}
             </h3>
-            <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-base leading-relaxed whitespace-pre-wrap min-h-[150px] transition-colors">
-              {transcription}
+            <div className={`
+              p-6 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 
+              text-slate-800 dark:text-slate-200 text-base leading-relaxed whitespace-pre-wrap min-h-[200px] transition-colors
+              ${isStreaming ? 'border-red-200 dark:border-red-900/30' : ''}
+            `}>
+              {transcription || <span className="text-slate-400 italic">...</span>}
+              {isStreaming && <span className="inline-block w-2 h-4 bg-red-500 ml-1 animate-pulse align-middle" />}
             </div>
-          </div>
-        )}
+        </div>
 
       </div>
     </div>
