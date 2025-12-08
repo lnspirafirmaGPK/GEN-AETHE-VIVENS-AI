@@ -3,7 +3,11 @@ import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle } from 'lucide-re
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { float32ToInt16, base64ToArrayBuffer, arrayBufferToBase64 } from '../services/audio';
 
-const LiveInterface: React.FC = () => {
+interface LiveInterfaceProps {
+  translations: any;
+}
+
+const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0);
@@ -46,9 +50,10 @@ const LiveInterface: React.FC = () => {
   const connectToLive = async () => {
     setError(null);
     try {
-      const { stream, inputCtx, outputCtx } = await initializeAudio();
-      
+      // Create AI instance first
       aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      const { stream, inputCtx, outputCtx } = await initializeAudio();
       
       const sessionPromise = aiRef.current.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -57,7 +62,7 @@ const LiveInterface: React.FC = () => {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
-          systemInstruction: 'You are a helpful AI assistant. Respond naturally. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.',
+          systemInstruction: 'You are a helpful AI assistant. Detect the user language automatically. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.',
         },
         callbacks: {
           onopen: () => {
@@ -135,7 +140,7 @@ const LiveInterface: React.FC = () => {
           },
           onerror: (err) => {
             console.error("Session error:", err);
-            setError("Connection error. Please try again.");
+            setError(translations.error);
             disconnect();
           }
         }
@@ -193,9 +198,13 @@ const LiveInterface: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 rounded-xl overflow-hidden text-white relative">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden relative border border-slate-200 dark:border-slate-800 transition-colors duration-200">
       {/* Background Ambience */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/40 via-slate-900 to-slate-900 z-0 pointer-events-none" />
+      <div className="absolute inset-0 z-0 pointer-events-none transition-colors duration-500
+        bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] 
+        from-blue-50 via-white to-white
+        dark:from-blue-900/40 dark:via-slate-900 dark:to-slate-900" 
+      />
 
       {/* Main Content */}
       <div className="relative z-10 flex flex-col items-center justify-center h-full p-8 space-y-8">
@@ -208,8 +217,8 @@ const LiveInterface: React.FC = () => {
           <div className={`
             w-48 h-48 rounded-full border-4 flex items-center justify-center relative shadow-2xl transition-all duration-300
             ${isConnected 
-              ? 'border-blue-400/30 bg-slate-800/80 backdrop-blur-md' 
-              : 'border-slate-700 bg-slate-800'}
+              ? 'border-blue-400/50 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md' 
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'}
           `}>
              {isConnected ? (
                <div className="flex gap-1 items-end h-16">
@@ -217,22 +226,22 @@ const LiveInterface: React.FC = () => {
                  {[...Array(5)].map((_, i) => (
                    <div 
                      key={i} 
-                     className="w-3 bg-blue-400 rounded-full transition-all duration-75"
+                     className="w-3 bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-75"
                      style={{ 
                        height: `${20 + (volumeLevel * 100 * Math.random())}%`,
-                       opacity: 0.7 
+                       opacity: 0.8 
                      }}
                    />
                  ))}
                </div>
              ) : (
-               <Radio size={48} className="text-slate-500" />
+               <Radio size={48} className="text-slate-300 dark:text-slate-600" />
              )}
           </div>
           
           {isConnected && (
-            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-blue-200 text-sm font-medium animate-pulse whitespace-nowrap">
-              Listening...
+            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-blue-600 dark:text-blue-300 text-sm font-medium animate-pulse whitespace-nowrap">
+              {translations.listening}
             </div>
           )}
         </div>
@@ -240,12 +249,12 @@ const LiveInterface: React.FC = () => {
         {/* Status Text */}
         <div className="text-center space-y-2 h-16 w-full max-w-lg">
           {!isConnected && !error && (
-            <p className="text-slate-400">
-              Start a real-time voice conversation with Gemini. Speak naturally in Thai or English.
+            <p className="text-slate-500 dark:text-slate-400 transition-colors">
+              {translations.initial}
             </p>
           )}
           {error && (
-             <div className="flex items-center justify-center gap-2 text-red-300 bg-red-900/20 border border-red-900/50 px-4 py-2 rounded-lg">
+             <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 px-4 py-2 rounded-lg">
                <AlertCircle size={16} />
                <span className="text-sm">{error}</span>
              </div>
@@ -260,7 +269,7 @@ const LiveInterface: React.FC = () => {
               className="group relative flex items-center justify-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-blue-500/25 active:scale-95"
             >
               <Mic size={20} />
-              <span>Start Conversation</span>
+              <span>{translations.start}</span>
             </button>
           ) : (
             <>
@@ -268,8 +277,8 @@ const LiveInterface: React.FC = () => {
                 onClick={toggleMute}
                 className={`p-4 rounded-full transition-all border ${
                   isMuted 
-                    ? 'bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30' 
-                    : 'bg-slate-700/50 border-slate-600 text-white hover:bg-slate-700'
+                    ? 'bg-red-100 dark:bg-red-500/20 border-red-200 dark:border-red-500/50 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-500/30' 
+                    : 'bg-slate-100 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
                 title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
               >
@@ -281,7 +290,7 @@ const LiveInterface: React.FC = () => {
                 className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-red-500/25 active:scale-95 flex items-center gap-2"
               >
                 <X size={20} />
-                <span>End Call</span>
+                <span>{translations.end}</span>
               </button>
             </>
           )}
@@ -289,9 +298,9 @@ const LiveInterface: React.FC = () => {
       </div>
       
       {/* Footer Info */}
-      <div className="absolute bottom-4 right-4 text-xs text-slate-500 flex items-center gap-1">
+      <div className="absolute bottom-4 right-4 text-xs text-slate-400 dark:text-slate-600 flex items-center gap-1 transition-colors">
         <Activity size={12} />
-        <span>Gemini 2.5 Live Audio (Preview)</span>
+        <span>{translations.footer}</span>
       </div>
     </div>
   );

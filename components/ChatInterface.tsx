@@ -1,32 +1,42 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, BrainCircuit, Loader2 } from 'lucide-react';
+import { Send, Bot, User as UserIcon, BrainCircuit, Loader2, Paperclip, X, FileText } from 'lucide-react';
 import { createChatSession } from '../services/gemini';
 import { ChatMessage, Sender } from '../types';
 import { Chat, GenerateContentResponse } from '@google/genai';
+import { blobToBase64 } from '../services/audio';
 
-const ChatInterface: React.FC = () => {
+interface ChatInterfaceProps {
+  translations: any;
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isThinkingMode, setIsThinkingMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
   
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
     // Initialize chat session
     chatSessionRef.current = createChatSession(isThinkingMode);
     
-    // Welcome message
-    setMessages([
-      {
-        id: 'init',
-        role: Sender.Bot,
-        text: 'Hello! I am Gemini. I can help you with complex tasks, coding, and reasoning in Thai or English.',
-        timestamp: Date.now(),
-      }
-    ]);
-  }, [isThinkingMode]);
+    // Welcome message - only on first load
+    if (!hasInitialized.current) {
+      setMessages([
+        {
+          id: 'init',
+          role: Sender.Bot,
+          text: translations.welcome,
+          timestamp: Date.now(),
+        }
+      ]);
+      hasInitialized.current = true;
+    }
+  }, [isThinkingMode, translations.welcome]); // Re-run if translations change
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,10 +46,26 @@ const ChatInterface: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.type === 'application/pdf') {
+        setAttachedFile(file);
+      } else {
+        alert("Please select a valid PDF file.");
+      }
+    }
+  };
+
+  const clearAttachment = () => {
+    setAttachedFile(null);
+  };
+
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !chatSessionRef.current || isLoading) return;
+    if ((!inputValue.trim() && !attachedFile) || !chatSessionRef.current || isLoading) return;
 
     const userText = inputValue;
+    const currentFile = attachedFile;
     
     // Create user message object
     const userMsg: ChatMessage = {
@@ -47,10 +73,12 @@ const ChatInterface: React.FC = () => {
       role: Sender.User,
       text: userText,
       timestamp: Date.now(),
+      attachment: currentFile ? { name: currentFile.name, type: 'pdf' } : undefined
     };
 
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
+    setAttachedFile(null);
     setIsLoading(true);
 
     try {
@@ -64,9 +92,31 @@ const ChatInterface: React.FC = () => {
         timestamp: Date.now(),
       }]);
 
-      const result: GenerateContentResponse = await chatSessionRef.current.sendMessage({
-        message: userText
-      });
+      let result: GenerateContentResponse;
+
+      if (currentFile) {
+        // Send with attachment using sendMessage (since chat handles history)
+        // We need to convert file to base64
+        const base64 = await blobToBase64(currentFile);
+        
+        result = await chatSessionRef.current.sendMessage({
+          content: {
+            parts: [
+              { text: userText || "Analyze this PDF." },
+              { 
+                inlineData: {
+                  mimeType: 'application/pdf',
+                  data: base64
+                }
+              }
+            ]
+          }
+        });
+      } else {
+         result = await chatSessionRef.current.sendMessage({
+          message: userText
+        });
+      }
 
       const responseText = result.text || "I couldn't generate a response.";
 
@@ -81,7 +131,7 @@ const ChatInterface: React.FC = () => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: Sender.Bot,
-        text: "Sorry, I encountered an error processing your request.",
+        text: translations.error,
         timestamp: Date.now(),
       }]);
     } finally {
@@ -90,16 +140,16 @@ const ChatInterface: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors duration-200">
       {/* Header */}
-      <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+      <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center transition-colors">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
             <Bot size={18} />
           </div>
           <div>
-            <h2 className="font-semibold text-slate-800">Gemini Pro Chat</h2>
-            <p className="text-xs text-slate-500">Powered by Gemini 3.0 Pro</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{translations.title}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{translations.subtitle}</p>
           </div>
         </div>
         
@@ -107,13 +157,13 @@ const ChatInterface: React.FC = () => {
           onClick={() => !isLoading && setIsThinkingMode(!isThinkingMode)}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
             isThinkingMode 
-              ? 'bg-purple-100 text-purple-700 border border-purple-200 shadow-sm' 
-              : 'bg-slate-100 text-slate-600 border border-transparent hover:bg-slate-200'
+              ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-sm' 
+              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
           }`}
           title="Enable deep reasoning capabilities"
         >
           <BrainCircuit size={16} />
-          <span>{isThinkingMode ? 'Thinking Mode On' : 'Thinking Mode Off'}</span>
+          <span className="hidden sm:inline">{isThinkingMode ? translations.thinkingOn : translations.thinkingOff}</span>
         </button>
       </div>
 
@@ -125,8 +175,10 @@ const ChatInterface: React.FC = () => {
             className={`flex gap-3 ${msg.role === Sender.User ? 'flex-row-reverse' : 'flex-row'}`}
           >
             <div className={`
-              w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1
-              ${msg.role === Sender.User ? 'bg-slate-800 text-white' : 'bg-blue-100 text-blue-600'}
+              w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-sm
+              ${msg.role === Sender.User 
+                ? 'bg-slate-800 dark:bg-slate-700 text-white' 
+                : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'}
             `}>
               {msg.role === Sender.User ? <UserIcon size={16} /> : <Bot size={16} />}
             </div>
@@ -135,19 +187,25 @@ const ChatInterface: React.FC = () => {
               <div className={`
                 px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap
                 ${msg.role === Sender.User 
-                  ? 'bg-slate-800 text-white rounded-tr-none' 
-                  : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'}
+                  ? 'bg-slate-800 dark:bg-blue-600 text-white rounded-tr-none border border-transparent' 
+                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none'}
               `}>
+                {msg.attachment && (
+                  <div className="mb-2 pb-2 border-b border-white/20 flex items-center gap-2">
+                    <Paperclip size={14} />
+                    <span className="text-xs font-medium">{msg.attachment.name}</span>
+                  </div>
+                )}
                 {msg.isThinking ? (
-                  <div className="flex items-center gap-2 text-slate-500 italic">
+                  <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 italic">
                     <Loader2 className="animate-spin" size={14} />
-                    <span>Thinking deeply...</span>
+                    <span>{translations.thinkingLoading}</span>
                   </div>
                 ) : (
                   msg.text
                 )}
               </div>
-              <span className="text-[10px] text-slate-400 mt-1 px-1">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 px-1">
                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
@@ -157,24 +215,53 @@ const ChatInterface: React.FC = () => {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white border-t border-slate-200">
-        <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-full border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+      <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors">
+        {attachedFile && (
+          <div className="mb-3 flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-lg max-w-fit border border-slate-200 dark:border-slate-700">
+            <div className="w-8 h-8 rounded bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400">
+              <FileText size={16} />
+            </div>
+            <div className="text-sm">
+              <p className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[150px]">{attachedFile.name}</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">{translations.pdfName}</p>
+            </div>
+            <button 
+              onClick={clearAttachment}
+              className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+        
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-full border border-slate-200 dark:border-slate-700 focus-within:border-blue-400 dark:focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/30 transition-all">
+          <label className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition-colors">
+            <input 
+              type="file" 
+              accept="application/pdf"
+              className="hidden"
+              onChange={handleFileSelect}
+              disabled={isLoading}
+            />
+            <Paperclip size={20} />
+          </label>
+          
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Type your message here (Thai or English)..."
-            className="flex-1 bg-transparent border-none focus:ring-0 px-4 py-2 text-sm text-slate-800 placeholder:text-slate-400"
+            placeholder={translations.placeholder}
+            className="flex-1 bg-transparent border-none focus:ring-0 px-2 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
             disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading}
+            disabled={(!inputValue.trim() && !attachedFile) || isLoading}
             className={`
               p-2.5 rounded-full text-white transition-all
-              ${!inputValue.trim() || isLoading 
-                ? 'bg-slate-300 cursor-not-allowed' 
+              ${(!inputValue.trim() && !attachedFile) || isLoading 
+                ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed' 
                 : 'bg-blue-600 hover:bg-blue-700 shadow-md'}
             `}
           >
@@ -182,9 +269,9 @@ const ChatInterface: React.FC = () => {
           </button>
         </div>
         {isThinkingMode && (
-          <p className="text-xs text-purple-600 mt-2 text-center flex items-center justify-center gap-1">
+          <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 text-center flex items-center justify-center gap-1">
             <BrainCircuit size={12} />
-            Thinking mode active: Responses may take longer but will be more thorough.
+            {translations.thinkingActive}
           </p>
         )}
       </div>
