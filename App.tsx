@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { MessageSquareText, Mic2, FileText, Sparkles, Moon, Sun, Globe } from 'lucide-react';
+import { MessageSquareText, Mic2, FileText, Sparkles, Moon, Sun, Globe, Code, ShieldAlert } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import LiveInterface from './components/LiveInterface';
 import Transcriber from './components/Transcriber';
+import CodegenInterface from './components/CodegenInterface'; // Import new CodegenInterface
 import { AppMode, Language, VoiceName, PREBUILT_VOICES } from './types'; // Import VoiceName and PREBUILT_VOICES
 import { translations } from './utils/localization';
 
@@ -26,6 +27,7 @@ const App: React.FC = () => {
     // Default to 'Kore' if no voice is saved or if saved voice is not in PREBUILT_VOICES
     return (savedVoice && PREBUILT_VOICES.includes(savedVoice as VoiceName)) ? (savedVoice as VoiceName) : 'Kore';
   });
+  const [systemDissonance, setSystemDissonance] = useState<number | null>(null); // NEW: Global system dissonance for Codegen
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -58,6 +60,13 @@ const App: React.FC = () => {
 
   const t = translations[language];
 
+  const getDissonanceColorClass = (score: number | null) => {
+    if (score === null) return 'text-slate-500 dark:text-slate-400';
+    if (score >= 80) return 'text-green-600 dark:text-green-400';
+    if (score >= 40) return 'text-orange-600 dark:text-orange-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200 font-sans">
       {/* Sidebar / Navigation */}
@@ -68,6 +77,14 @@ const App: React.FC = () => {
               AI
             </div>
             <span className="hidden lg:block ml-3 font-bold text-slate-800 dark:text-slate-100 text-sm xl:text-lg truncate">GEN-AETHE-VIVENS-AI</span>
+            {systemDissonance !== null && (
+              <div className="hidden lg:flex items-center gap-1 ml-4 text-xs">
+                <ShieldAlert size={14} className={getDissonanceColorClass(systemDissonance)} />
+                <span className={`${getDissonanceColorClass(systemDissonance)} font-semibold`}>
+                  {systemDissonance}
+                </span>
+              </div>
+            )}
           </div>
 
           <nav className="p-4 space-y-2">
@@ -105,6 +122,19 @@ const App: React.FC = () => {
             >
               <FileText size={22} />
               <span className="hidden lg:block">{t.sidebar.transcribe}</span>
+            </button>
+
+            {/* NEW: Codegen Button */}
+            <button
+              onClick={() => setActiveMode(AppMode.Codegen)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                activeMode === AppMode.Codegen
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              <Code size={22} />
+              <span className="hidden lg:block">{t.sidebar.codegen}</span>
             </button>
           </nav>
         </div>
@@ -150,6 +180,7 @@ const App: React.FC = () => {
           {activeMode === AppMode.Chat && <ChatInterface translations={t.chat} />}
           {activeMode === AppMode.Live && <LiveInterface translations={t.live} selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice} />} {/* Pass voice state */}
           {activeMode === AppMode.Transcribe && <Transcriber translations={t.transcribe} />}
+          {activeMode === AppMode.Codegen && <CodegenInterface translations={t.codegen} onUpdateSystemDissonance={setSystemDissonance} />}
         </div>
       </main>
     </div>

@@ -1,10 +1,12 @@
 
+
 export const translations = {
   en: {
     sidebar: {
        chat: "Chat & Reason",
        live: "Live Voice",
        transcribe: "Transcribe",
+       codegen: "Codegen", // NEW
        dark: "Dark Mode",
        light: "Light Mode",
        proTitle: "Pro Features",
@@ -52,6 +54,26 @@ export const translations = {
        micError: "Cannot access microphone.",
        copy: "Copy", // NEW
        copied: "Copied!" // NEW
+    },
+    codegen: { // NEW
+      title: "Dual-Core Code Generation",
+      subtitle: "Gemini (Drafting) + Claude (Vetting)",
+      welcome: "Hello! I'm your AI-powered codegen agent. I draft code with Gemini and vet it with Claude for safety and compliance. What code do you need?",
+      placeholder: "Describe the code you need (e.g., 'Python function to calculate Fibonacci sequence')...",
+      phaseDrafting: "Drafting code with Gemini...",
+      phaseVetting: "Vetting with Claude for security & compliance...",
+      phaseBlocked: "Code generation blocked!",
+      phaseFinalized: "Code generated and vetted!",
+      auditReport: "Security Audit Report",
+      flowId: "Flow ID",
+      feedback: "Feedback",
+      patimokkhaStatus: "Patimokkha Status", // New term for compliance/safety score
+      healthy: "Healthy",
+      minorWarnings: "Minor Warnings",
+      critical: "Critical",
+      notAvailable: "N/A",
+      score: "Score",
+      error: "An error occurred during code generation or vetting."
     }
   },
   th: {
@@ -59,6 +81,7 @@ export const translations = {
        chat: "แชทและเหตุผล",
        live: "สนทนาสด",
        transcribe: "ถอดความเสียง",
+       codegen: "สร้างโค้ด", // NEW
        dark: "โหมดมืด",
        light: "โหมดสว่าง",
        proTitle: "ฟีเจอร์โปร",
@@ -106,6 +129,26 @@ export const translations = {
        micError: "ไม่สามารถเข้าถึงไมโครโฟนได้",
        copy: "คัดลอก", // NEW
        copied: "คัดลอกแล้ว!" // NEW
+    },
+    codegen: { // NEW
+      title: "การสร้างโค้ดแบบ Dual-Core",
+      subtitle: "Gemini (ร่างโค้ด) + Claude (ตรวจสอบ)",
+      welcome: "สวัสดี! ฉันคือเอเจนต์สร้างโค้ดด้วย AI ฉันจะร่างโค้ดด้วย Gemini และตรวจสอบด้วย Claude เพื่อความปลอดภัยและการปฏิบัติตามข้อกำหนด คุณต้องการโค้ดแบบไหน?",
+      placeholder: "อธิบายโค้ดที่คุณต้องการ (เช่น 'ฟังก์ชัน Python สำหรับคำนวณลำดับ Fibonacci')...",
+      phaseDrafting: "กำลังร่างโค้ดด้วย Gemini...",
+      phaseVetting: "กำลังตรวจสอบความปลอดภัยและข้อกำหนดด้วย Claude...",
+      phaseBlocked: "การสร้างโค้ดถูกบล็อก!",
+      phaseFinalized: "สร้างและตรวจสอบโค้ดเรียบร้อยแล้ว!",
+      auditReport: "รายงานการตรวจสอบความปลอดภัย",
+      flowId: "ID กระบวนการ",
+      feedback: "ข้อเสนอแนะ",
+      patimokkhaStatus: "สถานะปาฏิโมกข์", // New term for compliance/safety score
+      healthy: "ปลอดภัย",
+      minorWarnings: "มีคำเตือนเล็กน้อย",
+      critical: "วิกฤต",
+      notAvailable: "ไม่มีข้อมูล",
+      score: "คะแนน",
+      error: "เกิดข้อผิดพลาดระหว่างการสร้างหรือตรวจสอบโค้ด"
     }
   }
 };
