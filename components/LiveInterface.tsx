@@ -22,7 +22,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nextStartTimeRef = useRef<number>(0);
-  const aiRef = useRef<GoogleGenAI | null>(null);
+  // Removed aiRef as GoogleGenAI will be instantiated directly within connectToLive
   const sessionRef = useRef<any>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -65,11 +65,11 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
     setError(null);
     try {
       if (!process.env.API_KEY) {
-        throw new Error("API Key not found.");
+        throw new Error("API Key not found. Please ensure it's configured.");
       }
 
-      // Create AI instance first
-      aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Instantiate GoogleGenAI directly here for each connection attempt
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const { stream, inputCtx, outputCtx } = await initializeAudio();
 
@@ -82,7 +82,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
         ? 'คุณคือผู้ช่วย AI อัจฉริยะที่พูดภาษาไทยได้อย่างคล่องแคล่ว สุภาพ และเป็นธรรมชาติ โปรดฟังและตอบโต้เป็นภาษาไทยเป็นหลัก แต่สามารถสลับเป็นภาษาอังกฤษได้ทันทีหากคู่สนทนาพูดภาษาอังกฤษ'
         : 'You are a helpful AI assistant. Detect the user language automatically. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.';
       
-      const sessionPromise = aiRef.current.live.connect({
+      const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: ['AUDIO'],
@@ -183,7 +183,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
 
     } catch (e: any) {
       console.error("Connection failed:", e);
-      setError(e.message || "Failed to establish connection.");
+      setError(e.message || "Failed to establish connection. Check console for details.");
       disconnect();
     }
   };
