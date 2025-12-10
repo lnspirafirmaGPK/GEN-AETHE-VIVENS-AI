@@ -75,6 +75,12 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
+      // Defensive check for ai and ai.live
+      if (!ai || !ai.live) {
+        console.error("GoogleGenAI instance or 'live' property is undefined:", ai);
+        throw new Error("Failed to initialize Gemini Live API. 'ai' object or 'live' property is missing. Please check API key and library version.");
+      }
+
       const { stream, inputCtx, outputCtx } = await initializeAudio();
 
       const userLang = navigator.language || 'en-US';
