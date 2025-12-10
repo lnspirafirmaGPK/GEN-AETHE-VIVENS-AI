@@ -7,13 +7,19 @@ import { AppMode, Language } from './types';
 import { translations } from './utils/localization';
 
 const App: React.FC = () => {
-  const [activeMode, setActiveMode] = useState<AppMode>(AppMode.Chat);
+  const [activeMode, setActiveMode] = useState<AppMode>(() => {
+    const savedMode = localStorage.getItem('activeMode');
+    return savedMode ? (savedMode as AppMode) : AppMode.Chat;
+  });
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) return savedTheme === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>(() => {
+    const savedLanguage = localStorage.getItem('language');
+    return savedLanguage ? (savedLanguage as Language) : 'en';
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -25,6 +31,14 @@ const App: React.FC = () => {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('activeMode', activeMode);
+  }, [activeMode]);
+
+  useEffect(() => {
+    localStorage.setItem('language', language);
+  }, [language]);
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
   
