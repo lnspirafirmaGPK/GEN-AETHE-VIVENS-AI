@@ -1,3 +1,4 @@
+
 export enum Sender {
   User = 'user',
   Bot = 'bot',
@@ -32,3 +33,7 @@ export interface LiveConnectionState {
 }
 
 export type Language = 'en' | 'th';
+
+// NEW: Prebuilt voice names for selection
+export type VoiceName = 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Zephyr';
+export const PREBUILT_VOICES: VoiceName[] = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];

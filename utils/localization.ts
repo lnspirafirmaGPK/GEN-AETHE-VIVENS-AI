@@ -1,3 +1,4 @@
+
 export const translations = {
   en: {
     sidebar: {
@@ -27,7 +28,15 @@ export const translations = {
        end: "End Call",
        initial: "Start a real-time voice conversation with Gemini. Speak naturally in Thai or English.",
        error: "Connection error. Please try again.",
-       footer: "Gemini 2.5 Live Audio (Preview)"
+       footer: "Gemini 2.5 Live Audio (Preview)",
+       voiceLabel: "Voice", // NEW
+       voices: { // NEW
+         Puck: "Puck",
+         Charon: "Charon",
+         Kore: "Kore",
+         Fenrir: "Fenrir",
+         Zephyr: "Zephyr",
+       }
     },
     transcribe: {
        title: "Audio Transcription",
@@ -40,7 +49,9 @@ export const translations = {
        transcribingBtn: "Transcribing...",
        result: "Transcription Result",
        error: "Failed to transcribe audio. Please try again.",
-       micError: "Cannot access microphone."
+       micError: "Cannot access microphone.",
+       copy: "Copy", // NEW
+       copied: "Copied!" // NEW
     }
   },
   th: {
@@ -71,7 +82,15 @@ export const translations = {
        end: "วางสาย",
        initial: "เริ่มการสนทนาด้วยเสียงแบบเรียลไทม์กับ Gemini พูดคุยอย่างเป็นธรรมชาติได้ทั้งภาษาไทยและอังกฤษ",
        error: "เกิดข้อผิดพลาดในการเชื่อมต่อ โปรดลองอีกครั้ง",
-       footer: "Gemini 2.5 Live Audio (ตัวอย่าง)"
+       footer: "Gemini 2.5 Live Audio (ตัวอย่าง)",
+       voiceLabel: "เสียง", // NEW
+       voices: { // NEW
+         Puck: "พัค",
+         Charon: "แชรอน",
+         Kore: "โคเร",
+         Fenrir: "เฟนริร์",
+         Zephyr: "เซเฟอร์",
+       }
     },
     transcribe: {
        title: "ถอดความเสียง",
@@ -84,7 +103,9 @@ export const translations = {
        transcribingBtn: "กำลังถอดความ...",
        result: "ผลลัพธ์การถอดความ",
        error: "ไม่สามารถถอดความเสียงได้ โปรดลองอีกครั้ง",
-       micError: "ไม่สามารถเข้าถึงไมโครโฟนได้"
+       micError: "ไม่สามารถเข้าถึงไมโครโฟนได้",
+       copy: "คัดลอก", // NEW
+       copied: "คัดลอกแล้ว!" // NEW
     }
   }
 };

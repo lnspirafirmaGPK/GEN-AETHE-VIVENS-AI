@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileAudio, Upload, Loader2, CheckCircle2, Mic, Square, Activity } from 'lucide-react';
+import { FileAudio, Upload, Loader2, CheckCircle2, Mic, Square, Activity, Copy, Check, AlertCircle } from 'lucide-react';
 import { transcribeAudioFile } from '../services/gemini';
 import { blobToBase64, float32ToInt16, arrayBufferToBase64 } from '../services/audio';
 import { GoogleGenAI, LiveServerMessage } from '@google/genai';
@@ -13,6 +13,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [copied, setCopied] = useState(false); // State for copy button feedback
   
   // Streaming states
   const [isStreaming, setIsStreaming] = useState(false);
@@ -39,7 +40,9 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
     setTranscription(''); // Clear previous transcription for new stream
     
     try {
-      if (!process.env.API_KEY) throw new Error("API Key missing");
+      if (!process.env.API_KEY) {
+        throw new Error("API Key not found. Please ensure it's configured in your environment.");
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -61,7 +64,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
         config: {
           responseModalities: ['AUDIO'], // Required by API even if we only want transcription
           inputAudioTranscription: {}, // Enable Input Transcription
-          systemInstruction: "You are a transcriber. Your only task is to listen.", // Keep model quiet
+          systemInstruction: "You are a transcriber. Your only task is to listen and provide accurate transcription.", // Keep model quiet
         },
         callbacks: {
           onopen: () => {
@@ -106,12 +109,22 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
               setTranscription(prev => prev + text);
             }
           },
-          onclose: () => {
+          onclose: (event) => { // Added event parameter
+            console.log("Streaming session closed:", event);
+            setError(`Streaming session closed unexpectedly. Code: ${event.code}, Reason: ${event.reason || 'N/A'}`);
             stopStreaming();
           },
-          onerror: (err) => {
-            console.error("Streaming error:", err);
-            setError(translations.error);
+          onerror: (errEvent: ErrorEvent) => { // Changed type to ErrorEvent
+            console.error("Streaming session error:", errEvent);
+            console.trace(); // Add trace for streaming errors
+            let userMessage = translations.error;
+            if (errEvent.message) {
+              userMessage = `Connection error: ${errEvent.message}.`;
+            } else if (errEvent.error) {
+              userMessage = `Connection error: ${errEvent.error.message || 'Unknown network issue'}.`;
+            }
+            userMessage += " Please check your network and API key configuration.";
+            setError(userMessage);
             stopStreaming();
           }
         }
@@ -119,9 +132,18 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
       
       sessionRef.current = sessionPromise;
 
-    } catch (err) {
-      console.error("Mic/Network error:", err);
-      setError(translations.micError);
+    } catch (err: any) {
+      console.error("Mic/Network error during streaming setup:", err);
+      console.trace(); // Add trace for mic/network setup errors
+      let userMessage = err.message || translations.micError;
+      if (userMessage.includes("API Key")) {
+         userMessage = "API Key not found or invalid. Please ensure it's correctly configured in your environment.";
+      } else if (userMessage.includes("microphone")) {
+        userMessage = "Could not access microphone. Please ensure permissions are granted.";
+      } else {
+        userMessage = `Streaming setup failed: ${userMessage}. Please check your network and API key configuration.`;
+      }
+      setError(userMessage);
       stopStreaming();
     }
   };
@@ -167,9 +189,25 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
       const result = await transcribeAudioFile(base64, audioFile.type);
       setTranscription(result);
     } catch (err) {
+      console.error("File transcription error:", err);
+      console.trace();
       setError(translations.error);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (transcription) {
+      navigator.clipboard.writeText(transcription)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+        })
+        .catch(err => {
+          console.error("Failed to copy text: ", err);
+          // Optionally show an error message to the user
+        });
     }
   };
 
@@ -286,18 +324,31 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
 
         {/* Error */}
         {error && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-sm rounded-lg border border-red-100 dark:border-red-900/30">
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-sm rounded-lg border border-red-100 dark:border-red-900/30 flex items-center gap-2">
+            <AlertCircle size={16} />
             {error}
           </div>
         )}
 
         {/* Result Area */}
         <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-              <CheckCircle2 size={16} className={transcription ? "text-green-500" : "text-slate-300"} />
-              {translations.result}
-              {isStreaming && <Activity size={14} className="animate-pulse text-red-500" />}
-            </h3>
+            <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <CheckCircle2 size={16} className={transcription ? "text-green-500" : "text-slate-300"} />
+                  {translations.result}
+                  {isStreaming && <Activity size={14} className="animate-pulse text-red-500" />}
+                </h3>
+                {transcription && (
+                    <button
+                        onClick={handleCopy}
+                        className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        title="Copy to Clipboard"
+                    >
+                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                        {copied ? "Copied!" : "Copy"}
+                    </button>
+                )}
+            </div>
             <div className={`
               p-6 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 
               text-slate-800 dark:text-slate-200 text-base leading-relaxed whitespace-pre-wrap min-h-[200px] transition-colors

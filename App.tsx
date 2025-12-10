@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { MessageSquareText, Mic2, FileText, Sparkles, Moon, Sun, Globe } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import LiveInterface from './components/LiveInterface';
 import Transcriber from './components/Transcriber';
-import { AppMode, Language } from './types';
+import { AppMode, Language, VoiceName, PREBUILT_VOICES } from './types'; // Import VoiceName and PREBUILT_VOICES
 import { translations } from './utils/localization';
 
 const App: React.FC = () => {
@@ -19,6 +20,11 @@ const App: React.FC = () => {
   const [language, setLanguage] = useState<Language>(() => {
     const savedLanguage = localStorage.getItem('language');
     return savedLanguage ? (savedLanguage as Language) : 'en';
+  });
+  const [selectedVoice, setSelectedVoice] = useState<VoiceName>(() => { // NEW: Voice selection state
+    const savedVoice = localStorage.getItem('selectedVoice');
+    // Default to 'Kore' if no voice is saved or if saved voice is not in PREBUILT_VOICES
+    return (savedVoice && PREBUILT_VOICES.includes(savedVoice as VoiceName)) ? (savedVoice as VoiceName) : 'Kore';
   });
 
   useEffect(() => {
@@ -39,6 +45,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('language', language);
   }, [language]);
+
+  useEffect(() => { // NEW: Persist selected voice
+    localStorage.setItem('selectedVoice', selectedVoice);
+  }, [selectedVoice]);
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
   
@@ -138,7 +148,7 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-hidden p-4 lg:p-6 relative">
         <div className="h-full w-full max-w-6xl mx-auto">
           {activeMode === AppMode.Chat && <ChatInterface translations={t.chat} />}
-          {activeMode === AppMode.Live && <LiveInterface translations={t.live} />}
+          {activeMode === AppMode.Live && <LiveInterface translations={t.live} selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice} />} {/* Pass voice state */}
           {activeMode === AppMode.Transcribe && <Transcriber translations={t.transcribe} />}
         </div>
       </main>

@@ -1,13 +1,17 @@
+
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle, Settings } from 'lucide-react'; // Added Settings icon
 import { GoogleGenAI, LiveServerMessage } from '@google/genai';
 import { float32ToInt16, base64ToArrayBuffer, arrayBufferToBase64 } from '../services/audio';
+import { PREBUILT_VOICES, VoiceName } from '../types'; // Import PREBUILT_VOICES and VoiceName
 
 interface LiveInterfaceProps {
   translations: any;
+  selectedVoice: VoiceName; // NEW: Prop for selected voice
+  setSelectedVoice: (voice: VoiceName) => void; // NEW: Setter for selected voice
 }
 
-const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
+const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoice, setSelectedVoice }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0); // User input volume
@@ -22,7 +26,6 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nextStartTimeRef = useRef<number>(0);
-  // Removed aiRef as GoogleGenAI will be instantiated directly within connectToLive
   const sessionRef = useRef<any>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -57,6 +60,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
       return { stream, inputCtx, outputCtx };
     } catch (err) {
       console.error("Audio initialization error:", err);
+      console.trace(); // Add trace for initialization errors
       throw new Error("Could not access microphone.");
     }
   };
@@ -65,19 +69,16 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
     setError(null);
     try {
       if (!process.env.API_KEY) {
-        throw new Error("API Key not found. Please ensure it's configured.");
+        throw new Error("API Key not found. Please ensure it's configured in your environment.");
       }
 
-      // Instantiate GoogleGenAI directly here for each connection attempt
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const { stream, inputCtx, outputCtx } = await initializeAudio();
 
-      // Detect user language from browser settings
       const userLang = navigator.language || 'en-US';
       const isThai = userLang.startsWith('th');
       
-      // Adjust system instruction based on detected language
       const systemInstruction = isThai 
         ? 'คุณคือผู้ช่วย AI อัจฉริยะที่พูดภาษาไทยได้อย่างคล่องแคล่ว สุภาพ และเป็นธรรมชาติ โปรดฟังและตอบโต้เป็นภาษาไทยเป็นหลัก แต่สามารถสลับเป็นภาษาอังกฤษได้ทันทีหากคู่สนทนาพูดภาษาอังกฤษ'
         : 'You are a helpful AI assistant. Detect the user language automatically. If the user speaks Thai, respond in Thai. If the user speaks English, respond in English.';
@@ -87,7 +88,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } }, // Use selectedVoice
           },
           systemInstruction: systemInstruction,
         },
@@ -152,7 +153,6 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
               const source = audioCtx.createBufferSource();
               source.buffer = audioBuffer;
               
-              // Route through analyser if available, otherwise straight to destination
               if (outputAnalyserRef.current) {
                 source.connect(outputAnalyserRef.current);
               } else {
@@ -167,13 +167,22 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
               nextStartTimeRef.current += audioBuffer.duration;
             }
           },
-          onclose: () => {
-            console.log("Session closed");
+          onclose: (event) => {
+            console.log("Session closed:", event);
+            setError(`Session closed unexpectedly. Code: ${event.code}, Reason: ${event.reason || 'N/A'}`);
             disconnect();
           },
-          onerror: (err) => {
-            console.error("Session error:", err);
-            setError(translations.error);
+          onerror: (errEvent: ErrorEvent) => {
+            console.error("Session error:", errEvent);
+            console.trace();
+            let userMessage = translations.error;
+            if (errEvent.message) {
+              userMessage = `Connection error: ${errEvent.message}.`;
+            } else if (errEvent.error) {
+              userMessage = `Connection error: ${errEvent.error.message || 'Unknown network issue'}.`;
+            }
+            userMessage += " Please check your network and API key configuration.";
+            setError(userMessage);
             disconnect();
           }
         }
@@ -183,7 +192,14 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
 
     } catch (e: any) {
       console.error("Connection failed:", e);
-      setError(e.message || "Failed to establish connection. Check console for details.");
+      console.trace();
+      let userMessage = e.message || "Failed to establish connection. Check console for details.";
+      if (userMessage.includes("API Key")) {
+        userMessage = "API Key not found or invalid. Please ensure it's correctly configured in your environment.";
+      } else {
+        userMessage = `Connection failed: ${userMessage}. Please check your network and API key configuration.`;
+      }
+      setError(userMessage);
       disconnect();
     }
   };
@@ -198,7 +214,6 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
       rafRef.current = null;
     }
 
-    // Clean up audio nodes
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current.onaudioprocess = null;
@@ -242,11 +257,9 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
         const dataArray = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
         outputAnalyserRef.current.getByteFrequencyData(dataArray);
         
-        // Calculate average volume
         const sum = dataArray.reduce((a, b) => a + b, 0);
         const avg = sum / dataArray.length;
         
-        // Normalize 0-1
         setAiVolume(avg / 255);
       }
       rafRef.current = requestAnimationFrame(updateVisualizers);
@@ -265,17 +278,24 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
   }, [isConnected]);
 
   useEffect(() => {
-    // Auto-connect if permission granted to provide seamless experience
-    navigator.permissions.query({ name: 'microphone' as PermissionName }).then((permissionStatus) => {
-      if (permissionStatus.state === 'granted') {
-        connectToLive();
+    const checkMicAndConnect = async () => {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        if (permissionStatus.state === 'granted') {
+          connectToLive();
+        }
+      } catch (e) {
+        console.error("Error querying microphone permission:", e);
+        setError("Could not check microphone permission. Please allow access manually.");
       }
-    });
+    };
+    
+    checkMicAndConnect();
 
     return () => {
       disconnect();
     };
-  }, []);
+  }, [selectedVoice]); // Re-run effect if selectedVoice changes to reconnect with new voice
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden relative border border-slate-200 dark:border-slate-800 transition-colors duration-200">
@@ -285,6 +305,35 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
         from-blue-50 via-white to-white
         dark:from-blue-900/40 dark:via-slate-900 dark:to-slate-900" 
       />
+
+      {/* Header with Voice Selection */}
+      <div className="relative z-10 flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
+            <Radio size={18} />
+          </div>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">{translations.sidebar.live}</h2>
+        </div>
+        
+        {/* Voice Selection Dropdown */}
+        <div className="flex items-center gap-2">
+          <Settings size={18} className="text-slate-500 dark:text-slate-400" />
+          <label htmlFor="voice-select" className="sr-only">{translations.live.voiceLabel}</label>
+          <select
+            id="voice-select"
+            value={selectedVoice}
+            onChange={(e) => setSelectedVoice(e.target.value as VoiceName)}
+            disabled={isConnected} // Disable while connected to prevent interruption
+            className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          >
+            {PREBUILT_VOICES.map(voice => (
+              <option key={voice} value={voice}>
+                {translations.live.voices[voice]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="relative z-10 flex flex-col items-center justify-center h-full p-8 space-y-8">
@@ -299,7 +348,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
                }} 
           />
           
-          {/* AI Voice Glow (Purple/Indigo) - Requested Feature */}
+          {/* AI Voice Glow (Purple/Indigo) */}
           <div className={`absolute inset-0 bg-indigo-500 rounded-full blur-2xl transition-all duration-100 ease-out mix-blend-screen`}
                style={{ 
                  transform: `scale(${1 + aiVolume * 2})`,
@@ -317,7 +366,6 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations }) => {
           `}>
              {isConnected ? (
                <div className="flex gap-1 items-end h-16">
-                 {/* Fake Visualizer bars driven by volume (mixed) */}
                  {[...Array(5)].map((_, i) => (
                    <div 
                      key={i} 
