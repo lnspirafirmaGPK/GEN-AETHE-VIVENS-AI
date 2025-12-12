@@ -6,11 +6,24 @@ export const translations = {
        chat: "Chat & Reason",
        live: "Live Voice",
        transcribe: "Transcribe",
-       codegen: "Codegen", // NEW
+       codegen: "Codegen",
+       menuSettings: "Menu Settings", // NEW
        dark: "Dark Mode",
        light: "Light Mode",
        proTitle: "Pro Features",
        proDesc: "Experience the power of Gemini 3.0 Pro for complex reasoning and Native Audio for real-time talk."
+    },
+    settings: { // NEW
+       title: "Settings",
+       subtitle: "Configure your application preferences",
+       appearance: "Appearance",
+       language: "Language",
+       system: "System",
+       reset: "Reset All Settings",
+       about: "About",
+       version: "Version 1.0.0 (Beta)",
+       developer: "Powered by Google Gemini",
+       voice: "Default Voice"
     },
     chat: {
        title: "Gemini Pro Chat",
@@ -31,8 +44,8 @@ export const translations = {
        initial: "Start a real-time voice conversation with Gemini. Speak naturally in Thai or English.",
        error: "Connection error. Please try again.",
        footer: "Gemini 2.5 Live Audio (Preview)",
-       voiceLabel: "Voice", // NEW
-       voices: { // NEW
+       voiceLabel: "Voice",
+       voices: {
          Puck: "Puck",
          Charon: "Charon",
          Kore: "Kore",
@@ -52,10 +65,10 @@ export const translations = {
        result: "Transcription Result",
        error: "Failed to transcribe audio. Please try again.",
        micError: "Cannot access microphone.",
-       copy: "Copy", // NEW
-       copied: "Copied!" // NEW
+       copy: "Copy",
+       copied: "Copied!"
     },
-    codegen: { // NEW
+    codegen: {
       title: "Dual-Core Code Generation",
       subtitle: "Gemini (Drafting) + Claude (Vetting)",
       welcome: "Hello! I'm your AI-powered codegen agent. I draft code with Gemini and vet it with Claude for safety and compliance. What code do you need?",
@@ -67,7 +80,7 @@ export const translations = {
       auditReport: "Security Audit Report",
       flowId: "Flow ID",
       feedback: "Feedback",
-      patimokkhaStatus: "Patimokkha Status", // New term for compliance/safety score
+      patimokkhaStatus: "Patimokkha Status",
       healthy: "Healthy",
       minorWarnings: "Minor Warnings",
       critical: "Critical",
@@ -91,11 +104,24 @@ export const translations = {
        chat: "แชทและเหตุผล",
        live: "สนทนาสด",
        transcribe: "ถอดความเสียง",
-       codegen: "สร้างโค้ด", // NEW
+       codegen: "สร้างโค้ด",
+       menuSettings: "การตั้งค่าเมนู", // NEW
        dark: "โหมดมืด",
        light: "โหมดสว่าง",
        proTitle: "ฟีเจอร์โปร",
        proDesc: "สัมผัสพลังของ Gemini 3.0 Pro สำหรับการให้เหตุผลที่ซับซ้อนและ Native Audio เพื่อการสนทนาแบบเรียลไทม์"
+    },
+    settings: { // NEW
+       title: "การตั้งค่า",
+       subtitle: "กำหนดค่าแอปพลิเคชัน",
+       appearance: "รูปลักษณ์",
+       language: "ภาษา",
+       system: "ระบบ",
+       reset: "รีเซ็ตการตั้งค่าทั้งหมด",
+       about: "เกี่ยวกับ",
+       version: "เวอร์ชัน 1.0.0 (เบต้า)",
+       developer: "ขับเคลื่อนโดย Google Gemini",
+       voice: "เสียงเริ่มต้น"
     },
     chat: {
        title: "แชท Gemini Pro",
@@ -116,8 +142,8 @@ export const translations = {
        initial: "เริ่มการสนทนาด้วยเสียงแบบเรียลไทม์กับ Gemini พูดคุยอย่างเป็นธรรมชาติได้ทั้งภาษาไทยและอังกฤษ",
        error: "เกิดข้อผิดพลาดในการเชื่อมต่อ โปรดลองอีกครั้ง",
        footer: "Gemini 2.5 Live Audio (ตัวอย่าง)",
-       voiceLabel: "เสียง", // NEW
-       voices: { // NEW
+       voiceLabel: "เสียง",
+       voices: {
          Puck: "พัค",
          Charon: "แชรอน",
          Kore: "โคเร",
@@ -137,10 +163,10 @@ export const translations = {
        result: "ผลลัพธ์การถอดความ",
        error: "ไม่สามารถถอดความเสียงได้ โปรดลองอีกครั้ง",
        micError: "ไม่สามารถเข้าถึงไมโครโฟนได้",
-       copy: "คัดลอก", // NEW
-       copied: "คัดลอกแล้ว!" // NEW
+       copy: "คัดลอก",
+       copied: "คัดลอกแล้ว!"
     },
-    codegen: { // NEW
+    codegen: {
       title: "การสร้างโค้ดแบบ Dual-Core",
       subtitle: "Gemini (ร่างโค้ด) + Claude (ตรวจสอบ)",
       welcome: "สวัสดี! ฉันคือเอเจนต์สร้างโค้ดด้วย AI ฉันจะร่างโค้ดด้วย Gemini และตรวจสอบด้วย Claude เพื่อความปลอดภัยและการปฏิบัติตามข้อกำหนด คุณต้องการโค้ดแบบไหน?",
@@ -152,7 +178,7 @@ export const translations = {
       auditReport: "รายงานการตรวจสอบความปลอดภัย",
       flowId: "ID กระบวนการ",
       feedback: "ข้อเสนอแนะ",
-      patimokkhaStatus: "สถานะปาฏิโมกข์", // New term for compliance/safety score
+      patimokkhaStatus: "สถานะปาฏิโมกข์",
       healthy: "ปลอดภัย",
       minorWarnings: "มีคำเตือนเล็กน้อย",
       critical: "วิกฤต",

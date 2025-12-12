@@ -22,6 +22,7 @@ export enum AppMode {
   Live = 'live',
   Transcribe = 'transcribe',
   Codegen = 'codegen',
+  Settings = 'settings', // NEW
 }
 
 export interface AudioVisualizerData {

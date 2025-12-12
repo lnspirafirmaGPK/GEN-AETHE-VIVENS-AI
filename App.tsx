@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { MessageSquareText, Mic2, FileText, Sparkles, Moon, Sun, Globe, Code, ShieldAlert } from 'lucide-react';
+import { MessageSquareText, Mic2, FileText, Sparkles, Moon, Sun, Globe, Code, ShieldAlert, Settings } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import LiveInterface from './components/LiveInterface';
 import Transcriber from './components/Transcriber';
 import CodegenInterface from './components/CodegenInterface'; // Import new CodegenInterface
+import SettingsInterface from './components/SettingsInterface'; // Import SettingsInterface
 import { AppMode, Language, VoiceName, PREBUILT_VOICES } from './types'; // Import VoiceName and PREBUILT_VOICES
 import { translations } from './utils/localization';
 
@@ -124,7 +124,6 @@ const App: React.FC = () => {
               <span className="hidden lg:block">{t.sidebar.transcribe}</span>
             </button>
 
-            {/* NEW: Codegen Button */}
             <button
               onClick={() => setActiveMode(AppMode.Codegen)}
               className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
@@ -135,6 +134,19 @@ const App: React.FC = () => {
             >
               <Code size={22} />
               <span className="hidden lg:block">{t.sidebar.codegen}</span>
+            </button>
+
+            {/* Menu Settings Button */}
+            <button
+              onClick={() => setActiveMode(AppMode.Settings)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                activeMode === AppMode.Settings
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              <Settings size={22} />
+              <span className="hidden lg:block">{t.sidebar.menuSettings}</span>
             </button>
           </nav>
         </div>
@@ -178,9 +190,18 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-hidden p-4 lg:p-6 relative">
         <div className="h-full w-full max-w-6xl mx-auto">
           {activeMode === AppMode.Chat && <ChatInterface translations={t.chat} />}
-          {activeMode === AppMode.Live && <LiveInterface translations={t.live} selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice} />} {/* Pass voice state */}
+          {activeMode === AppMode.Live && <LiveInterface translations={t.live} selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice} />} 
           {activeMode === AppMode.Transcribe && <Transcriber translations={t.transcribe} />}
           {activeMode === AppMode.Codegen && <CodegenInterface translations={t.codegen} onUpdateSystemDissonance={setSystemDissonance} />}
+          {activeMode === AppMode.Settings && <SettingsInterface 
+            translations={t.settings} 
+            isDarkMode={isDarkMode} 
+            toggleTheme={toggleTheme} 
+            language={language} 
+            toggleLanguage={toggleLanguage} 
+            selectedVoice={selectedVoice}
+            setSelectedVoice={setSelectedVoice}
+          />}
         </div>
       </main>
     </div>
