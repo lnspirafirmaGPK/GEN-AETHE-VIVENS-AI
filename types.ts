@@ -62,3 +62,11 @@ export interface CodegenMessage {
   artifact?: CodegenArtifact;
   feedback?: 'POSITIVE' | 'NEGATIVE';
 }
+
+export interface SavedCodeSnippet {
+  id: string;
+  code: string;
+  description: string;
+  timestamp: number;
+  engineSignature?: string;
+}

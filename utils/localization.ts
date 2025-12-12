@@ -73,7 +73,17 @@ export const translations = {
       critical: "Critical",
       notAvailable: "N/A",
       score: "Score",
-      error: "An error occurred during code generation or vetting."
+      error: "An error occurred during code generation or vetting.",
+      library: "Library",
+      save: "Save",
+      saved: "Saved",
+      delete: "Delete",
+      copy: "Copy",
+      copied: "Copied",
+      noSavedSnippets: "No saved code snippets yet.",
+      savedSnippets: "Saved Code Snippets",
+      clearAll: "Clear All",
+      confirmClearAll: "Are you sure you want to delete all saved snippets? This action cannot be undone.",
     }
   },
   th: {
@@ -148,7 +158,17 @@ export const translations = {
       critical: "วิกฤต",
       notAvailable: "ไม่มีข้อมูล",
       score: "คะแนน",
-      error: "เกิดข้อผิดพลาดระหว่างการสร้างหรือตรวจสอบโค้ด"
+      error: "เกิดข้อผิดพลาดระหว่างการสร้างหรือตรวจสอบโค้ด",
+      library: "ไลบรารี",
+      save: "บันทึก",
+      saved: "บันทึกแล้ว",
+      delete: "ลบ",
+      copy: "คัดลอก",
+      copied: "คัดลอกแล้ว",
+      noSavedSnippets: "ยังไม่มีโค้ดที่บันทึกไว้",
+      savedSnippets: "โค้ดที่บันทึกไว้",
+      clearAll: "ล้างทั้งหมด",
+      confirmClearAll: "คุณแน่ใจหรือไม่ว่าต้องการลบโค้ดที่บันทึกไว้ทั้งหมด? การดำเนินการนี้ไม่สามารถย้อนกลับได้",
     }
   }
 };

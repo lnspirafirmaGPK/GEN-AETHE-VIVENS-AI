@@ -59,6 +59,11 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
+      // Defensive check for ai and ai.live
+      if (!ai || !ai.live) {
+         throw new Error("Gemini Live API is not initialized. Please check your API key and library version.");
+      }
+      
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
@@ -141,7 +146,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
       } else if (userMessage.includes("microphone")) {
         userMessage = "Could not access microphone. Please ensure permissions are granted.";
       } else {
-        userMessage = `Streaming setup failed: ${userMessage}. Please check your network and API key configuration.`;
+        userMessage = `Streaming setup failed: ${userMessage}`;
       }
       setError(userMessage);
       stopStreaming();

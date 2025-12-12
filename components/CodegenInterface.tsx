@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, Code, LayoutDashboard, ThumbsUp, ThumbsDown, GitFork, ShieldAlert, CheckCircle, Ban } from 'lucide-react';
-import { CodegenMessage, Sender, CodegenPhase } from '../types';
+import { Send, Bot, User as UserIcon, Loader2, Code, LayoutDashboard, ThumbsUp, ThumbsDown, GitFork, ShieldAlert, CheckCircle, Ban, Book, Save, Trash2, Copy, Check, X } from 'lucide-react';
+import { CodegenMessage, Sender, CodegenPhase, SavedCodeSnippet } from '../types';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique flow IDs
 
 interface CodegenInterfaceProps {
@@ -18,7 +18,23 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
   // Mock Patimokkha Status: For frontend demo, we'll derive this from the latest response
   const [latestValidationScore, setLatestValidationScore] = useState<number | null>(null);
 
+  // Library State
+  const [savedSnippets, setSavedSnippets] = useState<SavedCodeSnippet[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [copiedStates, setCopiedStates] = useState<{[key: string]: boolean}>({});
+  const [savedStates, setSavedStates] = useState<{[key: string]: boolean}>({}); // Visual feedback for save buttons
+
   useEffect(() => {
+    // Load saved snippets
+    const loaded = localStorage.getItem('savedCodeSnippets');
+    if (loaded) {
+      try {
+        setSavedSnippets(JSON.parse(loaded));
+      } catch (e) {
+        console.error("Failed to parse saved snippets", e);
+      }
+    }
+
     // Welcome message - only on first load
     if (!hasInitialized.current) {
       setMessages([
@@ -45,6 +61,10 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
       onUpdateSystemDissonance(latestValidationScore);
     }
   }, [latestValidationScore, onUpdateSystemDissonance]);
+
+  useEffect(() => {
+    localStorage.setItem('savedCodeSnippets', JSON.stringify(savedSnippets));
+  }, [savedSnippets]);
 
   const handleSendCommand = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -140,6 +160,46 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
     console.log(`Feedback for Flow ID ${messages.find(m => m.id === messageId)?.flowId}: ${feedbackType}`);
   };
 
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedStates(prev => ({ ...prev, [id]: true }));
+    setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [id]: false }));
+    }, 2000);
+  };
+
+  const handleSaveSnippet = (code: string, flowId: string, msgId: string, engineSignature?: string) => {
+    // Find the associated user prompt to use as description
+    const associatedUserMsg = messages.find(m => m.id === flowId && m.role === Sender.User);
+    const description = associatedUserMsg?.text || "Generated Code";
+
+    const newSnippet: SavedCodeSnippet = {
+      id: uuidv4(),
+      code,
+      description: description.length > 50 ? description.substring(0, 50) + '...' : description,
+      timestamp: Date.now(),
+      engineSignature
+    };
+
+    setSavedSnippets(prev => [newSnippet, ...prev]);
+
+    // Visual feedback
+    setSavedStates(prev => ({ ...prev, [msgId]: true }));
+    setTimeout(() => {
+        setSavedStates(prev => ({ ...prev, [msgId]: false }));
+    }, 2000);
+  };
+
+  const handleDeleteSnippet = (id: string) => {
+    setSavedSnippets(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleClearAllSnippets = () => {
+    if (window.confirm(translations.confirmClearAll)) {
+        setSavedSnippets([]);
+    }
+  };
+
   const getPhaseIcon = (phase?: CodegenPhase) => {
     switch (phase) {
       case 'DRAFTING': return <GitFork size={16} className="text-blue-500" />;
@@ -170,7 +230,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
   const patimokkhaStatus = getPatimokkhaStatus(latestValidationScore);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors duration-200">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors duration-200 relative">
       {/* Header */}
       <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center transition-colors">
         <div className="flex items-center gap-2">
@@ -183,119 +243,230 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
           </div>
         </div>
         
-        {/* Patimokkha Status Bar (Simplified Local Display) */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <LayoutDashboard size={16} className="text-slate-500 dark:text-slate-400" />
-            <span className="hidden sm:inline text-slate-600 dark:text-slate-300">{translations.patimokkhaStatus}</span>
-            <span className={`${patimokkhaStatus.color} font-bold`}>{patimokkhaStatus.text}</span>
-            {latestValidationScore !== null && (
-              <span className="text-xs text-slate-500 dark:text-slate-400">({translations.score}: {latestValidationScore})</span>
-            )}
+        <div className="flex items-center gap-3">
+            {/* Patimokkha Status */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <LayoutDashboard size={16} className="text-slate-500 dark:text-slate-400" />
+                <span className="hidden sm:inline text-slate-600 dark:text-slate-300">{translations.patimokkhaStatus}</span>
+                <span className={`${patimokkhaStatus.color} font-bold`}>{patimokkhaStatus.text}</span>
+                {latestValidationScore !== null && (
+                <span className="text-xs text-slate-500 dark:text-slate-400">({translations.score}: {latestValidationScore})</span>
+                )}
+            </div>
+
+            {/* Library Toggle */}
+            <button 
+                onClick={() => setShowLibrary(!showLibrary)}
+                className={`p-2 rounded-lg transition-colors border ${showLibrary ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/50 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                title={translations.library}
+            >
+                <Book size={20} />
+            </button>
         </div>
       </div>
 
-      {/* Messages / Codegen Outputs */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex gap-3 ${msg.role === Sender.User ? 'flex-row-reverse' : 'flex-row'}`}
-          >
-            <div className={`
-              w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-sm
-              ${msg.role === Sender.User 
-                ? 'bg-slate-800 dark:bg-slate-700 text-white' 
-                : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400'}
-            `}>
-              {msg.role === Sender.User ? <UserIcon size={16} /> : <Code size={16} />}
-            </div>
-            
-            <div className={`flex flex-col max-w-[80%] ${msg.role === Sender.User ? 'items-end' : 'items-start'}`}>
-              <div className={`
-                px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap
+      {/* Main Content Area (Messages + Library Overlay) */}
+      <div className="flex-1 overflow-hidden relative flex">
+          
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {messages.map((msg) => (
+            <div
+                key={msg.id}
+                className={`flex gap-3 ${msg.role === Sender.User ? 'flex-row-reverse' : 'flex-row'}`}
+            >
+                <div className={`
+                w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-sm
                 ${msg.role === Sender.User 
-                  ? 'bg-slate-800 dark:bg-indigo-600 text-white rounded-tr-none border border-transparent' 
-                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none'}
-              `}>
-                {/* User Prompt */}
-                {msg.text && <p>{msg.text}</p>}
+                    ? 'bg-slate-800 dark:bg-slate-700 text-white' 
+                    : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400'}
+                `}>
+                {msg.role === Sender.User ? <UserIcon size={16} /> : <Code size={16} />}
+                </div>
+                
+                <div className={`flex flex-col max-w-[85%] ${msg.role === Sender.User ? 'items-end' : 'items-start'}`}>
+                <div className={`
+                    px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap
+                    ${msg.role === Sender.User 
+                    ? 'bg-slate-800 dark:bg-indigo-600 text-white rounded-tr-none border border-transparent' 
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none'}
+                `}>
+                    {/* User Prompt */}
+                    {msg.text && <p>{msg.text}</p>}
 
-                {/* Codegen Agent Response */}
-                {msg.role === Sender.Bot && (
-                  <>
-                    {/* Dual-Core Cog: Process Visualization */}
-                    {msg.currentPhase && (
-                      <div className={`flex items-center gap-2 font-medium mb-2 ${getPhaseColorClass(msg.currentPhase)}`}>
-                        {msg.isStreamingPhase ? <Loader2 className="animate-spin" size={16} /> : getPhaseIcon(msg.currentPhase)}
-                        <span className="text-xs sm:text-sm">
-                          {msg.currentPhase === 'DRAFTING' && translations.phaseDrafting}
-                          {msg.currentPhase === 'VETTING' && translations.phaseVetting}
-                          {msg.currentPhase === 'BLOCKED' && translations.phaseBlocked}
-                          {msg.currentPhase === 'FINALIZED' && translations.phaseFinalized}
-                        </span>
-                      </div>
-                    )}
-
-                    {msg.artifact && msg.artifact.source_code && (
-                      <div className="mt-2 p-3 bg-slate-700 text-white dark:bg-slate-950 dark:text-slate-100 rounded-lg overflow-x-auto text-xs font-mono">
-                        <pre><code>{msg.artifact.source_code}</code></pre>
-                      </div>
-                    )}
-
-                    {msg.artifact && msg.artifact.audit_report && (
-                      <div className={`mt-2 p-3 rounded-lg text-xs leading-relaxed ${
-                         msg.currentPhase === 'BLOCKED' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50' : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
-                      }`}>
-                        <h4 className="font-semibold flex items-center gap-1 mb-1">
-                            <ShieldAlert size={14} /> {translations.auditReport}
-                        </h4>
-                        <p>{msg.artifact.audit_report}</p>
-                        {msg.artifact.engine_signature && (
-                          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                            Engine: {msg.artifact.engine_signature}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {msg.flowId && (
-                      <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                        <span>{translations.flowId}: {msg.flowId.substring(0, 8)}...</span>
-                        
-                        {/* Akashic Traceability Module: Feedback/RSI */}
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{translations.feedback}:</span>
-                          <button 
-                            onClick={() => handleFeedback(msg.id, 'POSITIVE')}
-                            disabled={!!msg.feedback}
-                            className={`p-1 rounded-full transition-all ${msg.feedback === 'POSITIVE' ? 'bg-green-200 text-green-700 dark:bg-green-700 dark:text-green-200' : 'text-slate-400 hover:text-green-500 dark:hover:text-green-300'}`}
-                          >
-                            <ThumbsUp size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleFeedback(msg.id, 'NEGATIVE')}
-                            disabled={!!msg.feedback}
-                            className={`p-1 rounded-full transition-all ${msg.feedback === 'NEGATIVE' ? 'bg-red-200 text-red-700 dark:bg-red-700 dark:text-red-200' : 'text-slate-400 hover:text-red-500 dark:hover:text-red-300'}`}
-                          >
-                            <ThumbsDown size={16} />
-                          </button>
+                    {/* Codegen Agent Response */}
+                    {msg.role === Sender.Bot && (
+                    <>
+                        {/* Dual-Core Cog: Process Visualization */}
+                        {msg.currentPhase && (
+                        <div className={`flex items-center gap-2 font-medium mb-2 ${getPhaseColorClass(msg.currentPhase)}`}>
+                            {msg.isStreamingPhase ? <Loader2 className="animate-spin" size={16} /> : getPhaseIcon(msg.currentPhase)}
+                            <span className="text-xs sm:text-sm">
+                            {msg.currentPhase === 'DRAFTING' && translations.phaseDrafting}
+                            {msg.currentPhase === 'VETTING' && translations.phaseVetting}
+                            {msg.currentPhase === 'BLOCKED' && translations.phaseBlocked}
+                            {msg.currentPhase === 'FINALIZED' && translations.phaseFinalized}
+                            </span>
                         </div>
-                      </div>
+                        )}
+
+                        {/* Code Artifact with Header */}
+                        {msg.artifact && msg.artifact.source_code && (
+                        <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="bg-slate-100 dark:bg-slate-900 px-3 py-1.5 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
+                                <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Code</span>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleCopy(msg.artifact!.source_code, msg.id)}
+                                        className="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                        title={translations.copy}
+                                    >
+                                        {copiedStates[msg.id] ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                                        <span>{copiedStates[msg.id] ? translations.copied : translations.copy}</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleSaveSnippet(msg.artifact!.source_code, msg.flowId, msg.id, msg.artifact?.engine_signature)}
+                                        className="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                        title={savedStates[msg.id] ? translations.saved : translations.save}
+                                    >
+                                        {savedStates[msg.id] ? <Check size={14} className="text-green-500" /> : <Save size={14} />}
+                                        <span>{savedStates[msg.id] ? translations.saved : translations.save}</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-x-auto text-xs font-mono">
+                                <pre><code>{msg.artifact.source_code}</code></pre>
+                            </div>
+                        </div>
+                        )}
+
+                        {msg.artifact && msg.artifact.audit_report && (
+                        <div className={`mt-2 p-3 rounded-lg text-xs leading-relaxed ${
+                            msg.currentPhase === 'BLOCKED' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50' : 'bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                        }`}>
+                            <h4 className="font-semibold flex items-center gap-1 mb-1">
+                                <ShieldAlert size={14} /> {translations.auditReport}
+                            </h4>
+                            <p>{msg.artifact.audit_report}</p>
+                            {msg.artifact.engine_signature && (
+                            <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                                Engine: {msg.artifact.engine_signature}
+                            </p>
+                            )}
+                        </div>
+                        )}
+
+                        {msg.flowId && (
+                        <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/50 text-xs text-slate-400 dark:text-slate-500 flex items-center justify-between">
+                            <span>{translations.flowId}: {msg.flowId.substring(0, 8)}...</span>
+                            
+                            <div className="flex items-center gap-2">
+                            <span className="font-medium">{translations.feedback}:</span>
+                            <button 
+                                onClick={() => handleFeedback(msg.id, 'POSITIVE')}
+                                disabled={!!msg.feedback}
+                                className={`p-1 rounded-full transition-all ${msg.feedback === 'POSITIVE' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'text-slate-400 hover:text-green-500 dark:hover:text-green-400'}`}
+                            >
+                                <ThumbsUp size={14} />
+                            </button>
+                            <button 
+                                onClick={() => handleFeedback(msg.id, 'NEGATIVE')}
+                                disabled={!!msg.feedback}
+                                className={`p-1 rounded-full transition-all ${msg.feedback === 'NEGATIVE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'text-slate-400 hover:text-red-500 dark:hover:text-red-400'}`}
+                            >
+                                <ThumbsDown size={14} />
+                            </button>
+                            </div>
+                        </div>
+                        )}
+                    </>
                     )}
-                  </>
-                )}
-              </div>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 px-1">
-                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
+                </div>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 px-1">
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                </div>
             </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
-        ))}
-        <div ref={messagesEndRef} />
+
+          {/* Library Overlay */}
+          <div className={`
+              absolute inset-y-0 right-0 w-full sm:w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-xl transform transition-transform duration-300 ease-in-out z-20
+              ${showLibrary ? 'translate-x-0' : 'translate-x-full'}
+          `}>
+              <div className="h-full flex flex-col">
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                      <div className="flex items-center gap-2">
+                          <Book size={18} className="text-indigo-600 dark:text-indigo-400" />
+                          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{translations.savedSnippets}</h3>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {savedSnippets.length > 0 && (
+                            <button 
+                                onClick={handleClearAllSnippets}
+                                className="p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded hover:bg-red-50 dark:hover:bg-red-900/20 mr-1"
+                                title={translations.clearAll}
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
+                        <button onClick={() => setShowLibrary(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <X size={20} />
+                        </button>
+                      </div>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {savedSnippets.length === 0 ? (
+                          <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                              <Book size={48} className="mx-auto mb-2 opacity-20" />
+                              <p className="text-sm">{translations.noSavedSnippets}</p>
+                          </div>
+                      ) : (
+                          savedSnippets.map(snippet => (
+                              <div key={snippet.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200 line-clamp-2" title={snippet.description}>
+                                          {snippet.description}
+                                      </p>
+                                      <button 
+                                          onClick={() => handleDeleteSnippet(snippet.id)}
+                                          className="text-slate-400 hover:text-red-500 transition-colors ml-2"
+                                          title={translations.delete}
+                                      >
+                                          <Trash2 size={14} />
+                                      </button>
+                                  </div>
+                                  <div className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 p-2 mb-2 relative group">
+                                      <pre className="text-[10px] font-mono text-slate-600 dark:text-slate-400 overflow-hidden h-12">
+                                          <code>{snippet.code}</code>
+                                      </pre>
+                                      <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-slate-900 to-transparent pointer-events-none" />
+                                  </div>
+                                  <div className="flex justify-between items-center text-xs">
+                                      <span className="text-slate-400 text-[10px]">
+                                          {new Date(snippet.timestamp).toLocaleDateString()}
+                                      </span>
+                                      <button 
+                                          onClick={() => handleCopy(snippet.code, snippet.id)}
+                                          className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                                      >
+                                          {copiedStates[snippet.id] ? <Check size={12} /> : <Copy size={12} />}
+                                          {copiedStates[snippet.id] ? translations.copied : translations.copy}
+                                      </button>
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+          </div>
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors">
+      <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors z-30 relative">
         <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-full border border-slate-200 dark:border-slate-700 focus-within:border-indigo-400 dark:focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900/30 transition-all">
           <input
             type="text"
