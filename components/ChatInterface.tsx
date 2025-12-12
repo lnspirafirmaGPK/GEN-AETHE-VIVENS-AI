@@ -6,7 +6,7 @@ import { Chat, GenerateContentResponse } from '@google/genai';
 import { blobToBase64 } from '../services/audio';
 
 interface ChatInterfaceProps {
-  translations: any;
+  translations: any; // Changed to any to accept the full translation object
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
@@ -17,6 +17,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   
   const chatSessionRef = useRef<Chat | null>(null);
+  // Fix: Corrected typo from HTMLDivSlement to HTMLDivElement
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
 
@@ -30,7 +31,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
         {
           id: 'init',
           role: Sender.Bot,
-          text: translations.welcome,
+          text: translations.welcome, // Use translations.chat.welcome
           timestamp: Date.now(),
         }
       ]);
@@ -99,18 +100,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
         // We need to convert file to base64
         const base64 = await blobToBase64(currentFile);
         
+        // The `chat.sendMessage` method accepts a `message` parameter which can be a string, a Part, or an array of Parts.
         result = await chatSessionRef.current.sendMessage({
-          content: {
-            parts: [
-              { text: userText || "Analyze this PDF." },
-              { 
+          message: [
+            { text: userText || "Analyze this PDF." },
+            { 
                 inlineData: {
                   mimeType: 'application/pdf',
                   data: base64
                 }
-              }
-            ]
-          }
+            }
+          ]
         });
       } else {
          result = await chatSessionRef.current.sendMessage({
@@ -131,7 +131,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: Sender.Bot,
-        text: translations.error,
+        text: translations.error, // Use translations.chat.error
         timestamp: Date.now(),
       }]);
     } finally {
@@ -148,8 +148,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
             <Bot size={18} />
           </div>
           <div>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{translations.title}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{translations.subtitle}</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{translations.title}</h2> {/* Use translations.chat.title */}
+            <p className="text-xs text-slate-500 dark:text-slate-400">{translations.subtitle}</p> {/* Use translations.chat.subtitle */}
           </div>
         </div>
         
@@ -163,7 +163,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
           title="Enable deep reasoning capabilities"
         >
           <BrainCircuit size={16} />
-          <span className="hidden sm:inline">{isThinkingMode ? translations.thinkingOn : translations.thinkingOff}</span>
+          <span className="hidden sm:inline">{isThinkingMode ? translations.thinkingOn : translations.thinkingOff}</span> {/* Use translations.chat.thinkingOn/Off */}
         </button>
       </div>
 
@@ -199,7 +199,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
                 {msg.isThinking ? (
                   <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 italic">
                     <Loader2 className="animate-spin" size={14} />
-                    <span>{translations.thinkingLoading}</span>
+                    <span>{translations.thinkingLoading}</span> {/* Use translations.chat.thinkingLoading */}
                   </div>
                 ) : (
                   msg.text
@@ -223,7 +223,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
             </div>
             <div className="text-sm">
               <p className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[150px]">{attachedFile.name}</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">{translations.pdfName}</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">{translations.pdfName}</p> {/* Use translations.chat.pdfName */}
             </div>
             <button 
               onClick={clearAttachment}
@@ -251,7 +251,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder={translations.placeholder}
+            placeholder={translations.placeholder} {/* Use translations.chat.placeholder */}
             className="flex-1 bg-transparent border-none focus:ring-0 px-2 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
             disabled={isLoading}
           />
@@ -271,7 +271,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ translations }) => {
         {isThinkingMode && (
           <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 text-center flex items-center justify-center gap-1">
             <BrainCircuit size={12} />
-            {translations.thinkingActive}
+            {translations.thinkingActive} {/* Use translations.chat.thinkingActive */}
           </p>
         )}
       </div>

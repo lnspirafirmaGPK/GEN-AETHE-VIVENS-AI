@@ -1,15 +1,14 @@
 
-
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle, Settings } from 'lucide-react'; // Added Settings icon
-import { GoogleGenAI, LiveServerMessage } from '@google/genai';
+import { Mic, MicOff, Volume2, X, Activity, Radio, AlertCircle, Settings, KeyRound, DollarSign } from 'lucide-react'; // Added KeyRound, DollarSign icons
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { float32ToInt16, base64ToArrayBuffer, arrayBufferToBase64 } from '../services/audio';
 import { PREBUILT_VOICES, VoiceName } from '../types'; // Import PREBUILT_VOICES and VoiceName
 
 interface LiveInterfaceProps {
-  translations: any;
-  selectedVoice: VoiceName; // NEW: Prop for selected voice
-  setSelectedVoice: (voice: VoiceName) => void; // NEW: Setter for selected voice
+  translations: any; // Changed to any to accept the full translation object
+  selectedVoice: VoiceName;
+  setSelectedVoice: (voice: VoiceName) => void;
 }
 
 const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoice, setSelectedVoice }) => {
@@ -18,6 +17,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
   const [volumeLevel, setVolumeLevel] = useState(0); // User input volume
   const [aiVolume, setAiVolume] = useState(0); // AI output volume
   const [error, setError] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // Audio References
   const inputAudioContextRef = useRef<AudioContext | null>(null);
@@ -29,6 +29,15 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
   const nextStartTimeRef = useRef<number>(0);
   const sessionRef = useRef<any>(null);
   const rafRef = useRef<number | null>(null);
+
+  const checkApiKeyStatus = async () => {
+    if (typeof window.aistudio !== 'undefined' && await window.aistudio.hasSelectedApiKey()) {
+      setHasApiKey(true);
+    } else {
+      setHasApiKey(false);
+      setError((translations.apiKey || {}).selectKey); // Defensive access
+    }
+  };
 
   const initializeAudio = async () => {
     try {
@@ -68,9 +77,22 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
 
   const connectToLive = async () => {
     setError(null);
+    
+    // NEW: API Key check before connecting
+    if (typeof window.aistudio === 'undefined') {
+      setError((translations.apiKey || {}).keyNotFound); // Defensive access
+      return;
+    }
+    if (!(await window.aistudio.hasSelectedApiKey())) {
+      setHasApiKey(false);
+      setError((translations.apiKey || {}).selectKey); // Defensive access
+      return;
+    }
+    setHasApiKey(true); // Assume API key is present and valid
+
     try {
       if (!process.env.API_KEY) {
-        throw new Error("API Key not found. Please ensure it's configured in your environment.");
+        throw new Error((translations.apiKey || {}).keyNotFound); // Defensive access
       }
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -78,7 +100,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
       // Defensive check for ai and ai.live
       if (!ai || !ai.live) {
         console.error("GoogleGenAI instance or 'live' property is undefined:", ai);
-        throw new Error("Failed to initialize Gemini Live API. 'ai' object or 'live' property is missing. Please check API key and library version.");
+        throw new Error((translations.apiKey || {}).apiInitFailed); // Defensive access
       }
 
       const { stream, inputCtx, outputCtx } = await initializeAudio();
@@ -93,7 +115,8 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-          responseModalities: ['AUDIO'],
+          // The `responseModalities` array must contain `Modality.AUDIO` enum member.
+          responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } }, // Use selectedVoice
           },
@@ -178,17 +201,25 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
             console.log("Session closed:", event);
             setError(`Session closed unexpectedly. Code: ${event.code}, Reason: ${event.reason || 'N/A'}`);
             disconnect();
+            // Re-check API key status on close
+            checkApiKeyStatus();
           },
           onerror: (errEvent: ErrorEvent) => {
             console.error("Session error:", errEvent);
             console.trace();
-            let userMessage = translations.error;
+            let userMessage = translations.live.error; // Use translations.live.error
             if (errEvent.message) {
               userMessage = `Connection error: ${errEvent.message}.`;
             } else if (errEvent.error) {
               userMessage = `Connection error: ${errEvent.error.message || 'Unknown network issue'}.`;
             }
-            userMessage += " Please check your network and API key configuration.";
+            // NEW: Handle "Requested entity was not found." for API key re-selection
+            if (userMessage.includes("Requested entity was not found.")) {
+              setHasApiKey(false);
+              userMessage = (translations.apiKey || {}).reselectKey; // Defensive access
+            } else {
+              userMessage += " Please check your network and API key configuration.";
+            }
             setError(userMessage);
             disconnect();
           }
@@ -202,7 +233,8 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
       console.trace();
       let userMessage = e.message || "Failed to establish connection. Check console for details.";
       if (userMessage.includes("API Key")) {
-        userMessage = "API Key not found or invalid. Please ensure it's correctly configured in your environment.";
+        userMessage = (translations.apiKey || {}).keyNotFound; // Defensive access
+        setHasApiKey(false); // Set to false if API key is explicitly missing/invalid
       } else {
         userMessage = `Connection failed: ${userMessage}. Please check your network and API key configuration.`;
       }
@@ -257,6 +289,18 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
     setIsMuted(!isMuted);
   };
 
+  const handleSelectApiKey = async () => {
+    if (typeof window.aistudio !== 'undefined') {
+      await window.aistudio.openSelectKey();
+      // As per guidelines, assume success and immediately try to connect
+      setHasApiKey(true); 
+      setError(null); // Clear previous error
+      connectToLive(); // Attempt to connect immediately after opening dialog
+    } else {
+      setError((translations.apiKey || {}).keyNotFound); // Defensive access
+    }
+  };
+
   // Visualization Loop for AI Voice
   useEffect(() => {
     const updateVisualizers = () => {
@@ -280,29 +324,27 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
     }
 
     return () => {
+      // Fix: Pass the request ID (rafRef.current) to cancelAnimationFrame
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [isConnected]);
 
   useEffect(() => {
-    const checkMicAndConnect = async () => {
-      try {
-        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        if (permissionStatus.state === 'granted') {
-          connectToLive();
-        }
-      } catch (e) {
-        console.error("Error querying microphone permission:", e);
-        setError("Could not check microphone permission. Please allow access manually.");
-      }
-    };
-    
-    checkMicAndConnect();
+    // Initial check for API key when component mounts
+    checkApiKeyStatus();
+
+    // Re-run effect if selectedVoice changes to reconnect with new voice
+    // Only attempt to connect if API key is already verified
+    if (hasApiKey) {
+      disconnect(); // Disconnect current session to restart with new voice
+      connectToLive();
+    }
 
     return () => {
       disconnect();
     };
-  }, [selectedVoice]); // Re-run effect if selectedVoice changes to reconnect with new voice
+  }, [selectedVoice, hasApiKey]); // Add hasApiKey to dependency array
+
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden relative border border-slate-200 dark:border-slate-800 transition-colors duration-200">
@@ -330,7 +372,7 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
             id="voice-select"
             value={selectedVoice}
             onChange={(e) => setSelectedVoice(e.target.value as VoiceName)}
-            disabled={isConnected} // Disable while connected to prevent interruption
+            disabled={isConnected || !hasApiKey} // Disable while connected or no API key
             className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           >
             {PREBUILT_VOICES.map(voice => (
@@ -395,16 +437,16 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-sm font-medium animate-pulse whitespace-nowrap transition-colors duration-300
               ${aiVolume > 0.05 ? 'text-indigo-600 dark:text-indigo-300' : 'text-blue-600 dark:text-blue-300'}"
             >
-              {aiVolume > 0.05 ? "Gemini is speaking..." : translations.listening}
+              {aiVolume > 0.05 ? "Gemini is speaking..." : translations.live.listening}
             </div>
           )}
         </div>
 
-        {/* Status Text */}
+        {/* Status Text and API Key Prompt */}
         <div className="text-center space-y-2 h-16 w-full max-w-lg">
-          {!isConnected && !error && (
+          {!isConnected && !error && hasApiKey && (
             <p className="text-slate-500 dark:text-slate-400 transition-colors">
-              {translations.initial}
+              {translations.live.initial}
             </p>
           )}
           {error && (
@@ -413,19 +455,34 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
                <span className="text-sm">{error}</span>
              </div>
           )}
+          {!hasApiKey && !isConnected && (
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-orange-600 dark:text-orange-300 text-sm">{(translations.apiKey || {}).selectKey}</p> {/* Defensive access */}
+              <button
+                onClick={handleSelectApiKey}
+                className="group relative flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-orange-500/25 active:scale-95"
+              >
+                <KeyRound size={18} />
+                <span>{(translations.apiKey || {}).selectKeyButton}</span> {/* Defensive access */}
+              </button>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {(translations.apiKey || {}).billingMessage} <a href={(translations.apiKey || {}).billingLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{(translations.apiKey || {}).billingLinkText}</a> {/* Defensive access */}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Controls */}
         <div className="flex items-center gap-6">
-          {!isConnected ? (
+          {!isConnected && hasApiKey ? (
             <button
               onClick={connectToLive}
               className="group relative flex items-center justify-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-blue-500/25 active:scale-95"
             >
               <Mic size={20} />
-              <span>{translations.start}</span>
+              <span>{translations.live.start}</span>
             </button>
-          ) : (
+          ) : (isConnected && (
             <>
               <button
                 onClick={toggleMute}
@@ -444,17 +501,17 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ translations, selectedVoi
                 className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-red-500/25 active:scale-95 flex items-center gap-2"
               >
                 <X size={20} />
-                <span>{translations.end}</span>
+                <span>{translations.live.end}</span>
               </button>
             </>
-          )}
+          ))}
         </div>
       </div>
       
       {/* Footer Info */}
       <div className="absolute bottom-4 right-4 text-xs text-slate-400 dark:text-slate-600 flex items-center gap-1 transition-colors">
         <Activity size={12} />
-        <span>{translations.footer}</span>
+        <span>{translations.live.footer}</span>
       </div>
     </div>
   );

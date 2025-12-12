@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquareText, Mic2, FileText, Sparkles, Moon, Sun, Globe, Code, ShieldAlert, Settings } from 'lucide-react';
+import { MessageSquareText, Mic2, FileText, Sparkles, Moon, Sun, Globe, Code, ShieldAlert, Settings, GitMerge } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import LiveInterface from './components/LiveInterface';
 import Transcriber from './components/Transcriber';
 import CodegenInterface from './components/CodegenInterface'; // Import new CodegenInterface
+import MergeSimulatorInterface from './components/MergeSimulatorInterface'; // NEW: Import MergeSimulatorInterface
 import SettingsInterface from './components/SettingsInterface'; // Import SettingsInterface
 import { AppMode, Language, VoiceName, PREBUILT_VOICES } from './types'; // Import VoiceName and PREBUILT_VOICES
 import { translations } from './utils/localization';
@@ -136,6 +137,19 @@ const App: React.FC = () => {
               <span className="hidden lg:block">{t.sidebar.codegen}</span>
             </button>
 
+            {/* NEW: Merge Simulator Button */}
+            <button
+              onClick={() => setActiveMode(AppMode.MergeSimulator)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                activeMode === AppMode.MergeSimulator
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              <GitMerge size={22} />
+              <span className="hidden lg:block">{t.sidebar.mergeSimulator}</span>
+            </button>
+
             {/* Menu Settings Button */}
             <button
               onClick={() => setActiveMode(AppMode.Settings)}
@@ -189,10 +203,11 @@ const App: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden p-4 lg:p-6 relative">
         <div className="h-full w-full max-w-6xl mx-auto">
-          {activeMode === AppMode.Chat && <ChatInterface translations={t.chat} />}
-          {activeMode === AppMode.Live && <LiveInterface translations={t.live} selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice} />} 
-          {activeMode === AppMode.Transcribe && <Transcriber translations={t.transcribe} />}
+          {activeMode === AppMode.Chat && <ChatInterface translations={t} />} {/* Changed to t */}
+          {activeMode === AppMode.Live && <LiveInterface translations={t} selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice} />} {/* Changed to t */}
+          {activeMode === AppMode.Transcribe && <Transcriber translations={t} />} {/* Changed to t */}
           {activeMode === AppMode.Codegen && <CodegenInterface translations={t.codegen} onUpdateSystemDissonance={setSystemDissonance} />}
+          {activeMode === AppMode.MergeSimulator && <MergeSimulatorInterface translations={t.mergeSimulator} />} {/* NEW */}
           {activeMode === AppMode.Settings && <SettingsInterface 
             translations={t.settings} 
             isDarkMode={isDarkMode} 

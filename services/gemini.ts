@@ -1,6 +1,12 @@
+
+
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 
 export const createChatSession = (useThinking: boolean = false) => {
+  if (!process.env.API_KEY) {
+    throw new Error("API Key not found. Please select an API Key to enable this feature.");
+  }
+
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-pro-preview';
   
@@ -19,6 +25,10 @@ export const createChatSession = (useThinking: boolean = false) => {
 };
 
 export const transcribeAudioFile = async (audioBase64: string, mimeType: string): Promise<string> => {
+  if (!process.env.API_KEY) {
+    throw new Error("API Key not found. Please select an API Key to enable this feature.");
+  }
+  
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   // Use Flash for fast transcription
   const model = 'gemini-2.5-flash'; 

@@ -7,13 +7,14 @@ export const translations = {
        live: "Live Voice",
        transcribe: "Transcribe",
        codegen: "Codegen",
-       menuSettings: "Menu Settings", // NEW
+       mergeSimulator: "Merge Simulator", // NEW
+       menuSettings: "Menu Settings", 
        dark: "Dark Mode",
        light: "Light Mode",
        proTitle: "Pro Features",
        proDesc: "Experience the power of Gemini 3.0 Pro for complex reasoning and Native Audio for real-time talk."
     },
-    settings: { // NEW
+    settings: { 
        title: "Settings",
        subtitle: "Configure your application preferences",
        appearance: "Appearance",
@@ -97,6 +98,44 @@ export const translations = {
       savedSnippets: "Saved Code Snippets",
       clearAll: "Clear All",
       confirmClearAll: "Are you sure you want to delete all saved snippets? This action cannot be undone.",
+    },
+    mergeSimulator: { // NEW
+      title: "Merge Strategy Simulator",
+      subtitle: "Explore Flask API & JWT with Interactive Merge Logic",
+      description: "This interface simulates a Flask API for managing Git merge requests. It features JWT-based authentication and enforces merge strategies based on protected branches.",
+      authSection: "Authentication",
+      userId: "User ID",
+      generateToken: "Get Token",
+      generatedToken: "Generated Token",
+      tokenPlaceholder: "Enter a user ID (e.g., 'admin', 'dev')",
+      tokenError: "Token generation failed.",
+      tokenCopied: "Token Copied!",
+      secretKey: "SECRET_KEY for JWT",
+      mergeSection: "Merge Request Simulation",
+      fromBranch: "From Branch",
+      toBranch: "To Branch",
+      strategy: "Strategy",
+      sendRequest: "Send Merge Request",
+      response: "API Response",
+      responsePlaceholder: "API responses will appear here...",
+      mergeSuccess: "Merge simulation successful!",
+      mergeFailed: "Merge simulation failed.",
+      copyToken: "Copy Token",
+      copyCode: "Copy Code",
+      copied: "Copied!",
+      codeExplanation: "Flask Backend Code",
+      codeExplanationDesc: "This Python code defines the backend logic for JWT generation and merge request handling.",
+    },
+    // NEW: API Key translations
+    apiKey: {
+      selectKey: "Please select an API Key to enable this feature.",
+      selectKeyButton: "Select API Key",
+      billingLink: "ai.google.dev/gemini-api/docs/billing", 
+      billingLinkText: "Billing Documentation",
+      billingMessage: "You must select an API key from a paid GCP project.",
+      reselectKey: "API Key failed to authenticate or was not found. Please re-select your API Key.",
+      keyNotFound: "API Key not found in environment. Please select one.",
+      apiInitFailed: "Failed to initialize Gemini API. Ensure API Key is valid and library version is correct."
     }
   },
   th: {
@@ -105,13 +144,14 @@ export const translations = {
        live: "สนทนาสด",
        transcribe: "ถอดความเสียง",
        codegen: "สร้างโค้ด",
-       menuSettings: "การตั้งค่าเมนู", // NEW
+       mergeSimulator: "จำลองการผสาน", // NEW
+       menuSettings: "การตั้งค่าเมนู", 
        dark: "โหมดมืด",
        light: "โหมดสว่าง",
        proTitle: "ฟีเจอร์โปร",
        proDesc: "สัมผัสพลังของ Gemini 3.0 Pro สำหรับการให้เหตุผลที่ซับซ้อนและ Native Audio เพื่อการสนทนาแบบเรียลไทม์"
     },
-    settings: { // NEW
+    settings: { 
        title: "การตั้งค่า",
        subtitle: "กำหนดค่าแอปพลิเคชัน",
        appearance: "รูปลักษณ์",
@@ -195,6 +235,44 @@ export const translations = {
       savedSnippets: "โค้ดที่บันทึกไว้",
       clearAll: "ล้างทั้งหมด",
       confirmClearAll: "คุณแน่ใจหรือไม่ว่าต้องการลบโค้ดที่บันทึกไว้ทั้งหมด? การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+    },
+    mergeSimulator: { // NEW
+      title: "เครื่องจำลองกลยุทธ์การผสาน",
+      subtitle: "สำรวจ Flask API & JWT ด้วยตรรกะการผสานแบบโต้ตอบ",
+      description: "อินเทอร์เฟซนี้จำลอง Flask API สำหรับการจัดการคำขอผสาน Git โดยมีการรับรองความถูกต้องด้วย JWT และบังคับใช้กลยุทธ์การผสานตามสาขาที่ได้รับการป้องกัน",
+      authSection: "การรับรองความถูกต้อง",
+      userId: "รหัสผู้ใช้",
+      generateToken: "สร้างโทเค็น",
+      generatedToken: "โทเค็นที่สร้าง",
+      tokenPlaceholder: "ป้อนรหัสผู้ใช้ (เช่น 'admin', 'dev')",
+      tokenError: "การสร้างโทเค็นล้มเหลว",
+      tokenCopied: "คัดลอกโทเค็นแล้ว!",
+      secretKey: "SECRET_KEY สำหรับ JWT",
+      mergeSection: "การจำลองคำขอผสาน",
+      fromBranch: "จากสาขา",
+      toBranch: "ถึงสาขา",
+      strategy: "กลยุทธ์",
+      sendRequest: "ส่งคำขอผสาน",
+      response: "การตอบกลับ API",
+      responsePlaceholder: "การตอบกลับ API จะปรากฏที่นี่...",
+      mergeSuccess: "จำลองการผสานสำเร็จ!",
+      mergeFailed: "จำลองการผสานล้มเหลว",
+      copyToken: "คัดลอกโทเค็น",
+      copyCode: "คัดลอกโค้ด",
+      copied: "คัดลอกแล้ว!",
+      codeExplanation: "โค้ดแบ็กเอนด์ Flask",
+      codeExplanationDesc: "โค้ด Python นี้กำหนดตรรกะแบ็กเอนด์สำหรับการสร้าง JWT และการจัดการคำขอผสาน",
+    },
+    // NEW: API Key translations
+    apiKey: {
+      selectKey: "โปรดเลือก API Key เพื่อเปิดใช้งานคุณสมบัตินี้",
+      selectKeyButton: "เลือก API Key",
+      billingLink: "ai.google.dev/gemini-api/docs/billing", 
+      billingLinkText: "เอกสารประกอบการเรียกเก็บเงิน",
+      billingMessage: "คุณต้องเลือก API Key จากโปรเจกต์ GCP ที่มีการเรียกเก็บเงิน",
+      reselectKey: "API Key ไม่สามารถตรวจสอบสิทธิ์ได้หรือหาไม่พบ โปรดเลือก API Key ใหม่อีกครั้ง",
+      keyNotFound: "ไม่พบ API Key ในสภาพแวดล้อม โปรดเลือก API Key",
+      apiInitFailed: "ไม่สามารถเริ่มต้น Gemini API ได้ โปรดตรวจสอบว่า API Key ถูกต้องและเวอร์ชันไลบรารีถูกต้อง"
     }
   }
 };

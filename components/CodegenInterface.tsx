@@ -4,7 +4,7 @@ import { CodegenMessage, Sender, CodegenPhase, SavedCodeSnippet } from '../types
 import { v4 as uuidv4 } from 'uuid'; // For generating unique flow IDs
 
 interface CodegenInterfaceProps {
-  translations: any;
+  translations: any; // Changed to any to accept the full translation object
   onUpdateSystemDissonance?: (score: number | null) => void;
 }
 
@@ -41,7 +41,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
         {
           id: 'init',
           role: Sender.Bot,
-          text: translations.welcome,
+          text: translations.welcome, // Use translations.codegen.welcome
           timestamp: Date.now(),
           currentPhase: 'FINALIZED', // Initial state is 'finalized' as a welcome
           flowId: uuidv4(),
@@ -143,7 +143,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
       console.error("Codegen error:", error);
       setMessages(prev => prev.map(msg =>
         msg.id === requestId
-          ? { ...msg, currentPhase: 'BLOCKED', text: translations.error, isStreamingPhase: false }
+          ? { ...msg, currentPhase: 'BLOCKED', text: translations.error, isStreamingPhase: false } // Use translations.codegen.error
           : msg
       ));
       setLatestValidationScore(0); // Indicate critical error
@@ -195,7 +195,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
   };
 
   const handleClearAllSnippets = () => {
-    if (window.confirm(translations.confirmClearAll)) {
+    if (window.confirm(translations.confirmClearAll)) { // Use translations.codegen.confirmClearAll
         setSavedSnippets([]);
     }
   };
@@ -221,10 +221,10 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
   };
 
   const getPatimokkhaStatus = (score: number | null) => {
-    if (score === null) return { text: translations.notAvailable, color: 'text-slate-500 dark:text-slate-400' };
-    if (score >= 80) return { text: translations.healthy, color: 'text-green-600 dark:text-green-400' };
-    if (score >= 40) return { text: translations.minorWarnings, color: 'text-orange-600 dark:text-orange-400' };
-    return { text: translations.critical, color: 'text-red-600 dark:text-red-400' };
+    if (score === null) return { text: translations.notAvailable, color: 'text-slate-500 dark:text-slate-400' }; // Use translations.codegen.notAvailable
+    if (score >= 80) return { text: translations.healthy, color: 'text-green-600 dark:text-green-400' }; // Use translations.codegen.healthy
+    if (score >= 40) return { text: translations.minorWarnings, color: 'text-orange-600 dark:text-orange-400' }; // Use translations.codegen.minorWarnings
+    return { text: translations.critical, color: 'text-red-600 dark:text-red-400' }; // Use translations.codegen.critical
   };
 
   const patimokkhaStatus = getPatimokkhaStatus(latestValidationScore);
@@ -238,8 +238,8 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
             <Code size={18} />
           </div>
           <div>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{translations.title}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{translations.subtitle}</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{translations.title}</h2> {/* Use translations.codegen.title */}
+            <p className="text-xs text-slate-500 dark:text-slate-400">{translations.subtitle}</p> {/* Use translations.codegen.subtitle */}
           </div>
         </div>
         
@@ -247,10 +247,10 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
             {/* Patimokkha Status */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                 <LayoutDashboard size={16} className="text-slate-500 dark:text-slate-400" />
-                <span className="hidden sm:inline text-slate-600 dark:text-slate-300">{translations.patimokkhaStatus}</span>
+                <span className="hidden sm:inline text-slate-600 dark:text-slate-300">{translations.patimokkhaStatus}</span> {/* Use translations.codegen.patimokkhaStatus */}
                 <span className={`${patimokkhaStatus.color} font-bold`}>{patimokkhaStatus.text}</span>
                 {latestValidationScore !== null && (
-                <span className="text-xs text-slate-500 dark:text-slate-400">({translations.score}: {latestValidationScore})</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">({translations.score}: {latestValidationScore})</span> {/* Use translations.codegen.score */}
                 )}
             </div>
 
@@ -258,7 +258,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
             <button 
                 onClick={() => setShowLibrary(!showLibrary)}
                 className={`p-2 rounded-lg transition-colors border ${showLibrary ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/50 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                title={translations.library}
+                title={translations.library} {/* Use translations.codegen.library */}
             >
                 <Book size={20} />
             </button>
@@ -302,10 +302,10 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
                         <div className={`flex items-center gap-2 font-medium mb-2 ${getPhaseColorClass(msg.currentPhase)}`}>
                             {msg.isStreamingPhase ? <Loader2 className="animate-spin" size={16} /> : getPhaseIcon(msg.currentPhase)}
                             <span className="text-xs sm:text-sm">
-                            {msg.currentPhase === 'DRAFTING' && translations.phaseDrafting}
-                            {msg.currentPhase === 'VETTING' && translations.phaseVetting}
-                            {msg.currentPhase === 'BLOCKED' && translations.phaseBlocked}
-                            {msg.currentPhase === 'FINALIZED' && translations.phaseFinalized}
+                            {msg.currentPhase === 'DRAFTING' && translations.phaseDrafting} {/* Use translations.codegen.phaseDrafting */}
+                            {msg.currentPhase === 'VETTING' && translations.phaseVetting} {/* Use translations.codegen.phaseVetting */}
+                            {msg.currentPhase === 'BLOCKED' && translations.phaseBlocked} {/* Use translations.codegen.phaseBlocked */}
+                            {msg.currentPhase === 'FINALIZED' && translations.phaseFinalized} {/* Use translations.codegen.phaseFinalized */}
                             </span>
                         </div>
                         )}
@@ -319,18 +319,18 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
                                     <button 
                                         onClick={() => handleCopy(msg.artifact!.source_code, msg.id)}
                                         className="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                                        title={translations.copy}
+                                        title={translations.copy} {/* Use translations.codegen.copy */}
                                     >
                                         {copiedStates[msg.id] ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                                        <span>{copiedStates[msg.id] ? translations.copied : translations.copy}</span>
+                                        <span>{copiedStates[msg.id] ? translations.copied : translations.copy}</span> {/* Use translations.codegen.copied/copy */}
                                     </button>
                                     <button 
                                         onClick={() => handleSaveSnippet(msg.artifact!.source_code, msg.flowId, msg.id, msg.artifact?.engine_signature)}
                                         className="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                                        title={savedStates[msg.id] ? translations.saved : translations.save}
+                                        title={savedStates[msg.id] ? translations.saved : translations.save} {/* Use translations.codegen.saved/save */}
                                     >
                                         {savedStates[msg.id] ? <Check size={14} className="text-green-500" /> : <Save size={14} />}
-                                        <span>{savedStates[msg.id] ? translations.saved : translations.save}</span>
+                                        <span>{savedStates[msg.id] ? translations.saved : translations.save}</span> {/* Use translations.codegen.saved/save */}
                                     </button>
                                 </div>
                             </div>
@@ -345,7 +345,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
                             msg.currentPhase === 'BLOCKED' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50' : 'bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                         }`}>
                             <h4 className="font-semibold flex items-center gap-1 mb-1">
-                                <ShieldAlert size={14} /> {translations.auditReport}
+                                <ShieldAlert size={14} /> {translations.auditReport} {/* Use translations.codegen.auditReport */}
                             </h4>
                             <p>{msg.artifact.audit_report}</p>
                             {msg.artifact.engine_signature && (
@@ -358,10 +358,10 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
 
                         {msg.flowId && (
                         <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/50 text-xs text-slate-400 dark:text-slate-500 flex items-center justify-between">
-                            <span>{translations.flowId}: {msg.flowId.substring(0, 8)}...</span>
+                            <span>{translations.flowId}: {msg.flowId.substring(0, 8)}...</span> {/* Use translations.codegen.flowId */}
                             
                             <div className="flex items-center gap-2">
-                            <span className="font-medium">{translations.feedback}:</span>
+                            <span className="font-medium">{translations.feedback}:</span> {/* Use translations.codegen.feedback */}
                             <button 
                                 onClick={() => handleFeedback(msg.id, 'POSITIVE')}
                                 disabled={!!msg.feedback}
@@ -400,14 +400,14 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
                   <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                       <div className="flex items-center gap-2">
                           <Book size={18} className="text-indigo-600 dark:text-indigo-400" />
-                          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{translations.savedSnippets}</h3>
+                          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{translations.savedSnippets}</h3> {/* Use translations.codegen.savedSnippets */}
                       </div>
                       <div className="flex items-center gap-1">
                         {savedSnippets.length > 0 && (
                             <button 
                                 onClick={handleClearAllSnippets}
                                 className="p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded hover:bg-red-50 dark:hover:bg-red-900/20 mr-1"
-                                title={translations.clearAll}
+                                title={translations.clearAll} {/* Use translations.codegen.clearAll */}
                             >
                                 <Trash2 size={16} />
                             </button>
@@ -422,7 +422,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
                       {savedSnippets.length === 0 ? (
                           <div className="text-center py-10 text-slate-400 dark:text-slate-500">
                               <Book size={48} className="mx-auto mb-2 opacity-20" />
-                              <p className="text-sm">{translations.noSavedSnippets}</p>
+                              <p className="text-sm">{translations.noSavedSnippets}</p> {/* Use translations.codegen.noSavedSnippets */}
                           </div>
                       ) : (
                           savedSnippets.map(snippet => (
@@ -434,7 +434,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
                                       <button 
                                           onClick={() => handleDeleteSnippet(snippet.id)}
                                           className="text-slate-400 hover:text-red-500 transition-colors ml-2"
-                                          title={translations.delete}
+                                          title={translations.delete} {/* Use translations.codegen.delete */}
                                       >
                                           <Trash2 size={14} />
                                       </button>
@@ -454,7 +454,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
                                           className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
                                       >
                                           {copiedStates[snippet.id] ? <Check size={12} /> : <Copy size={12} />}
-                                          {copiedStates[snippet.id] ? translations.copied : translations.copy}
+                                          {copiedStates[snippet.id] ? translations.copied : translations.copy} {/* Use translations.codegen.copied/copy */}
                                       </button>
                                   </div>
                               </div>
@@ -473,7 +473,7 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendCommand()}
-            placeholder={translations.placeholder}
+            placeholder={translations.placeholder} {/* Use translations.codegen.placeholder */}
             className="flex-1 bg-transparent border-none focus:ring-0 px-2 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
             disabled={isLoading}
           />
@@ -493,8 +493,8 @@ const CodegenInterface: React.FC<CodegenInterfaceProps> = ({ translations, onUpd
         {isLoading && (
           <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2 text-center flex items-center justify-center gap-1">
             <Loader2 className="animate-spin" size={12} />
-            {messages.length > 0 && messages[messages.length - 1]?.currentPhase === 'DRAFTING' && translations.phaseDrafting}
-            {messages.length > 0 && messages[messages.length - 1]?.currentPhase === 'VETTING' && translations.phaseVetting}
+            {messages.length > 0 && messages[messages.length - 1]?.currentPhase === 'DRAFTING' && translations.phaseDrafting} {/* Use translations.codegen.phaseDrafting */}
+            {messages.length > 0 && messages[messages.length - 1]?.currentPhase === 'VETTING' && translations.phaseVetting} {/* Use translations.codegen.phaseVetting */}
           </p>
         )}
       </div>

@@ -22,7 +22,8 @@ export enum AppMode {
   Live = 'live',
   Transcribe = 'transcribe',
   Codegen = 'codegen',
-  Settings = 'settings', // NEW
+  MergeSimulator = 'mergeSimulator', // NEW
+  Settings = 'settings', 
 }
 
 export interface AudioVisualizerData {
@@ -70,4 +71,24 @@ export interface SavedCodeSnippet {
   description: string;
   timestamp: number;
   engineSignature?: string;
+}
+
+// NEW: Merge Simulator specific types
+export interface MergeSimulationResponse {
+  status?: string;
+  merged_from?: string;
+  merged_to?: string;
+  strategy?: string;
+  error?: string;
+}
+
+export interface TokenGenerationResponse {
+  token?: string;
+  error?: string;
+}
+
+export interface FlaskCodeLine {
+  text: string;
+  highlighted?: boolean;
+  explanation?: string;
 }

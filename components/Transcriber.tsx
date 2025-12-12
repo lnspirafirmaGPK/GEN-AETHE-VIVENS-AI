@@ -1,11 +1,12 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { FileAudio, Upload, Loader2, CheckCircle2, Mic, Square, Activity, Copy, Check, AlertCircle } from 'lucide-react';
+import { FileAudio, Upload, Loader2, CheckCircle2, Mic, Square, Activity, Copy, Check, AlertCircle, KeyRound, DollarSign } from 'lucide-react'; // Added KeyRound, DollarSign icons
 import { transcribeAudioFile } from '../services/gemini';
 import { blobToBase64, float32ToInt16, arrayBufferToBase64 } from '../services/audio';
-import { GoogleGenAI, LiveServerMessage } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 
 interface TranscriberProps {
-  translations: any;
+  translations: any; // Changed to any to accept the full translation object
 }
 
 const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
@@ -18,6 +19,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
   // Streaming states
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamVolume, setStreamVolume] = useState(0);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // Audio Refs
   const inputAudioContextRef = useRef<AudioContext | null>(null);
@@ -25,6 +27,15 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<any>(null);
+
+  const checkApiKeyStatus = async () => {
+    if (typeof window.aistudio !== 'undefined' && await window.aistudio.hasSelectedApiKey()) {
+      setHasApiKey(true);
+    } else {
+      setHasApiKey(false);
+      setError((translations.apiKey || {}).selectKey); // Defensive access
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -39,9 +50,21 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
     setError(null);
     setTranscription(''); // Clear previous transcription for new stream
     
+    // NEW: API Key check before connecting
+    if (typeof window.aistudio === 'undefined') {
+      setError((translations.apiKey || {}).keyNotFound); // Defensive access
+      return;
+    }
+    if (!(await window.aistudio.hasSelectedApiKey())) {
+      setHasApiKey(false);
+      setError((translations.apiKey || {}).selectKey); // Defensive access
+      return;
+    }
+    setHasApiKey(true); // Assume API key is present and valid
+
     try {
       if (!process.env.API_KEY) {
-        throw new Error("API Key not found. Please ensure it's configured in your environment.");
+        throw new Error((translations.apiKey || {}).keyNotFound); // Defensive access
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -61,13 +84,14 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
       
       // Defensive check for ai and ai.live
       if (!ai || !ai.live) {
-         throw new Error("Gemini Live API is not initialized. Please check your API key and library version.");
+         throw new Error((translations.apiKey || {}).apiInitFailed); // Defensive access
       }
       
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-          responseModalities: ['AUDIO'], // Required by API even if we only want transcription
+          // The `responseModalities` array must contain `Modality.AUDIO` enum member.
+          responseModalities: [Modality.AUDIO], // Required by API even if we only want transcription
           inputAudioTranscription: {}, // Enable Input Transcription
           systemInstruction: "You are a transcriber. Your only task is to listen and provide accurate transcription.", // Keep model quiet
         },
@@ -118,17 +142,25 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
             console.log("Streaming session closed:", event);
             setError(`Streaming session closed unexpectedly. Code: ${event.code}, Reason: ${event.reason || 'N/A'}`);
             stopStreaming();
+            // Re-check API key status on close
+            checkApiKeyStatus();
           },
           onerror: (errEvent: ErrorEvent) => { // Changed type to ErrorEvent
             console.error("Streaming session error:", errEvent);
             console.trace(); // Add trace for streaming errors
-            let userMessage = translations.error;
+            let userMessage = translations.transcribe.error; // Use translations.transcribe.error
             if (errEvent.message) {
               userMessage = `Connection error: ${errEvent.message}.`;
             } else if (errEvent.error) {
               userMessage = `Connection error: ${errEvent.error.message || 'Unknown network issue'}.`;
             }
-            userMessage += " Please check your network and API key configuration.";
+            // NEW: Handle "Requested entity was not found." for API key re-selection
+            if (userMessage.includes("Requested entity was not found.")) {
+              setHasApiKey(false);
+              userMessage = (translations.apiKey || {}).reselectKey; // Defensive access
+            } else {
+              userMessage += " Please check your network and API key configuration.";
+            }
             setError(userMessage);
             stopStreaming();
           }
@@ -140,9 +172,10 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
     } catch (err: any) {
       console.error("Mic/Network error during streaming setup:", err);
       console.trace(); // Add trace for mic/network setup errors
-      let userMessage = err.message || translations.micError;
+      let userMessage = err.message || translations.transcribe.micError; // Use translations.transcribe.micError
       if (userMessage.includes("API Key")) {
-         userMessage = "API Key not found or invalid. Please ensure it's correctly configured in your environment.";
+         userMessage = (translations.apiKey || {}).keyNotFound; // Defensive access
+         setHasApiKey(false); // Set to false if API key is explicitly missing/invalid
       } else if (userMessage.includes("microphone")) {
         userMessage = "Could not access microphone. Please ensure permissions are granted.";
       } else {
@@ -186,6 +219,18 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
   const handleTranscribeFile = async () => {
     if (!audioFile) return;
 
+    // NEW: API Key check for file transcription
+    if (typeof window.aistudio === 'undefined') {
+      setError((translations.apiKey || {}).keyNotFound); // Defensive access
+      return;
+    }
+    if (!(await window.aistudio.hasSelectedApiKey())) {
+      setHasApiKey(false);
+      setError((translations.apiKey || {}).selectKey); // Defensive access
+      return;
+    }
+    setHasApiKey(true); // Assume API key is present and valid
+
     setIsProcessing(true);
     setError(null);
 
@@ -193,10 +238,18 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
       const base64 = await blobToBase64(audioFile);
       const result = await transcribeAudioFile(base64, audioFile.type);
       setTranscription(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("File transcription error:", err);
       console.trace();
-      setError(translations.error);
+      let userMessage = translations.transcribe.error; // Use translations.transcribe.error
+      if (err.message.includes("API Key")) { // Check for API Key error from service
+        userMessage = (translations.apiKey || {}).keyNotFound; // Defensive access
+        setHasApiKey(false);
+      } else if (err.message.includes("Requested entity was not found.")) {
+        setHasApiKey(false);
+        userMessage = (translations.apiKey || {}).reselectKey; // Defensive access
+      }
+      setError(userMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -216,12 +269,25 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
     }
   };
 
+  const handleSelectApiKey = async () => {
+    if (typeof window.aistudio !== 'undefined') {
+      await window.aistudio.openSelectKey();
+      // As per guidelines, assume success and immediately try to re-check
+      setHasApiKey(true); 
+      setError(null); // Clear previous error
+      checkApiKeyStatus(); // Re-check status which might trigger connection if previously waiting
+    } else {
+      setError((translations.apiKey || {}).keyNotFound); // Defensive access
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
+    checkApiKeyStatus(); // Initial check on mount
     return () => {
       if (isStreaming) stopStreaming();
     };
-  }, [isStreaming]);
+  }, [isStreaming]); // Only re-run if isStreaming changes, avoids infinite loops with hasApiKey
 
   return (
     <div className="h-full bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 overflow-y-auto transition-colors duration-200">
@@ -232,11 +298,29 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 mb-2">
             <FileAudio size={24} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{translations.title}</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{translations.transcribe.title}</h2> {/* Use translations.transcribe.title */}
           <p className="text-slate-500 dark:text-slate-400">
-            {translations.desc}
+            {translations.transcribe.desc}
           </p>
         </div>
+
+        {/* API Key Prompt (if missing) */}
+        {!hasApiKey && (
+          <div className="bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-300 p-4 rounded-lg border border-orange-100 dark:border-orange-900/30 text-center space-y-3">
+            <AlertCircle size={20} className="mx-auto" />
+            <p className="text-sm font-medium">{(translations.apiKey || {}).selectKey}</p> {/* Defensive access */}
+            <button
+              onClick={handleSelectApiKey}
+              className="group relative flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-full font-semibold text-sm transition-all shadow-lg hover:shadow-orange-500/25 active:scale-95 mx-auto"
+            >
+              <KeyRound size={18} />
+              <span>{(translations.apiKey || {}).selectKeyButton}</span> {/* Defensive access */}
+            </button>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+                {(translations.apiKey || {}).billingMessage} <a href={(translations.apiKey || {}).billingLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{(translations.apiKey || {}).billingLinkText}</a> {/* Defensive access */}
+            </p>
+          </div>
+        )}
 
         {/* Input Methods */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -246,6 +330,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
             ${audioFile && !isStreaming 
               ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' 
               : 'border-slate-300 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800'}
+            ${!hasApiKey && 'opacity-50 cursor-not-allowed'}
           `}>
             <input 
               type="file" 
@@ -253,12 +338,12 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
               onChange={handleFileUpload} 
               className="hidden" 
               id="audio-upload"
-              disabled={isProcessing || isStreaming}
+              disabled={isProcessing || isStreaming || !hasApiKey}
             />
             <label htmlFor="audio-upload" className="cursor-pointer flex flex-col items-center w-full">
                <Upload size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
-               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{translations.uploadLabel}</span>
-               <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">{translations.uploadDesc}</span>
+               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{translations.transcribe.uploadLabel}</span> {/* Use translations.transcribe.uploadLabel */}
+               <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">{translations.transcribe.uploadDesc}</span> {/* Use translations.transcribe.uploadDesc */}
             </label>
           </div>
 
@@ -268,6 +353,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
             ${isStreaming 
               ? 'border-red-400 dark:border-red-500 bg-red-50 dark:bg-red-900/20' 
               : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}
+            ${!hasApiKey && 'opacity-50 cursor-not-allowed'}
           `}>
             {isStreaming ? (
               <div className="relative">
@@ -275,6 +361,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
                 <button 
                   onClick={stopStreaming}
                   className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white hover:bg-red-600 transition-colors z-10 relative"
+                  disabled={!hasApiKey}
                 >
                   <Square size={24} fill="currentColor" />
                 </button>
@@ -282,7 +369,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
             ) : (
               <button 
                 onClick={startStreaming}
-                disabled={isProcessing}
+                disabled={isProcessing || !hasApiKey}
                 className="w-16 h-16 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
               >
                 <Mic size={28} />
@@ -290,7 +377,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
             )}
             <div className="flex flex-col items-center">
               <span className={`text-sm font-medium ${isStreaming ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
-                {isStreaming ? translations.recordingBtn : translations.recordBtn}
+                {isStreaming ? translations.transcribe.recordingBtn : translations.transcribe.recordBtn} {/* Use translations.transcribe.recordingBtn/recordBtn */}
               </span>
               {isStreaming && (
                 <div className="h-1 w-20 bg-slate-200 dark:bg-slate-700 rounded-full mt-2 overflow-hidden">
@@ -318,11 +405,11 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
              </div>
              <button
                onClick={handleTranscribeFile}
-               disabled={isProcessing || isStreaming}
+               disabled={isProcessing || isStreaming || !hasApiKey}
                className="bg-indigo-600 dark:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
              >
                {isProcessing ? <Loader2 className="animate-spin" size={16} /> : null}
-               {isProcessing ? translations.transcribingBtn : translations.transcribeBtn}
+               {isProcessing ? translations.transcribe.transcribingBtn : translations.transcribe.transcribeBtn} {/* Use translations.transcribe.transcribingBtn/transcribeBtn */}
              </button>
           </div>
         )}
@@ -340,7 +427,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <CheckCircle2 size={16} className={transcription ? "text-green-500" : "text-slate-300"} />
-                  {translations.result}
+                  {translations.transcribe.result} {/* Use translations.transcribe.result */}
                   {isStreaming && <Activity size={14} className="animate-pulse text-red-500" />}
                 </h3>
                 {transcription && (
@@ -350,7 +437,7 @@ const Transcriber: React.FC<TranscriberProps> = ({ translations }) => {
                         title="Copy to Clipboard"
                     >
                         {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                        {copied ? "Copied!" : "Copy"}
+                        {copied ? translations.transcribe.copied : translations.transcribe.copy} {/* Use translations.transcribe.copied/copy */}
                     </button>
                 )}
             </div>

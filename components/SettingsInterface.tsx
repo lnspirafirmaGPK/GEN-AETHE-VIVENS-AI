@@ -3,7 +3,7 @@ import { Settings, Moon, Sun, Globe, Monitor, Shield, Info, Volume2 } from 'luci
 import { Language, VoiceName, PREBUILT_VOICES } from '../types';
 
 interface SettingsInterfaceProps {
-  translations: any;
+  translations: any; // Changed to any to accept the full translation object
   isDarkMode: boolean;
   toggleTheme: () => void;
   language: Language;
@@ -30,9 +30,9 @@ const SettingsInterface: React.FC<SettingsInterfaceProps> = ({
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mb-2">
             <Settings size={24} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{translations.title}</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{translations.title}</h2> {/* Use translations.settings.title */}
           <p className="text-slate-500 dark:text-slate-400">
-            {translations.subtitle}
+            {translations.subtitle} {/* Use translations.settings.subtitle */}
           </p>
         </div>
 
@@ -40,7 +40,7 @@ const SettingsInterface: React.FC<SettingsInterfaceProps> = ({
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
             <Monitor size={18} className="text-indigo-500" />
-            <h3 className="font-semibold text-slate-700 dark:text-slate-200">{translations.appearance}</h3>
+            <h3 className="font-semibold text-slate-700 dark:text-slate-200">{translations.appearance}</h3> {/* Use translations.settings.appearance */}
           </div>
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
@@ -49,7 +49,7 @@ const SettingsInterface: React.FC<SettingsInterfaceProps> = ({
                   {isDarkMode ? <Moon size={20} className="text-white" /> : <Sun size={20} className="text-orange-500" />}
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-slate-200">{isDarkMode ? translations.appearance : translations.appearance}</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-200">{translations.appearance}</p> {/* Use translations.settings.appearance */}
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     {isDarkMode ? 'Dark Mode Active' : 'Light Mode Active'}
                   </p>
@@ -69,7 +69,7 @@ const SettingsInterface: React.FC<SettingsInterfaceProps> = ({
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
             <Globe size={18} className="text-blue-500" />
-            <h3 className="font-semibold text-slate-700 dark:text-slate-200">{translations.system}</h3>
+            <h3 className="font-semibold text-slate-700 dark:text-slate-200">{translations.system}</h3> {/* Use translations.settings.system */}
           </div>
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
@@ -78,7 +78,7 @@ const SettingsInterface: React.FC<SettingsInterfaceProps> = ({
                   <Globe size={20} className="text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-slate-200">{translations.language}</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-200">{translations.language}</p> {/* Use translations.settings.language */}
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     {language === 'en' ? 'English' : 'ภาษาไทย'}
                   </p>
@@ -99,7 +99,7 @@ const SettingsInterface: React.FC<SettingsInterfaceProps> = ({
                   <Volume2 size={20} className="text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-slate-200">{translations.voice}</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-200">{translations.voice}</p> {/* Use translations.settings.voice */}
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     {selectedVoice}
                   </p>
@@ -122,16 +122,16 @@ const SettingsInterface: React.FC<SettingsInterfaceProps> = ({
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
             <Info size={18} className="text-slate-500" />
-            <h3 className="font-semibold text-slate-700 dark:text-slate-200">{translations.about}</h3>
+            <h3 className="font-semibold text-slate-700 dark:text-slate-200">{translations.about}</h3> {/* Use translations.settings.about */}
           </div>
           <div className="p-6">
             <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
                     <span className="text-slate-600 dark:text-slate-400">Gen-Aethe-Vivens AI</span>
-                    <span className="text-sm font-mono text-slate-500">{translations.version}</span>
+                    <span className="text-sm font-mono text-slate-500">{translations.version}</span> {/* Use translations.settings.version */}
                 </div>
                 <div className="flex justify-between items-center mt-2">
-                    <span className="text-sm text-slate-500">{translations.developer}</span>
+                    <span className="text-sm text-slate-500">{translations.developer}</span> {/* Use translations.settings.developer */}
                     <Shield size={14} className="text-green-500" />
                 </div>
             </div>
